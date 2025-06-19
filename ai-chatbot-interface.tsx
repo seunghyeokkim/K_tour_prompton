@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ChatMessage } from "./components/chat-message"
 import { searchLocation, isLocationQuery, extractLocationFromMessage } from "./utils/location-service"
+import { sendToStartAPI } from "./utils/api"
 import type { Message, TextMessage, MapMessage } from "./types/chat"
 
 export default function AIChatbotInterface() {
@@ -25,61 +26,111 @@ export default function AIChatbotInterface() {
     scrollToBottom()
   }, [messages])
 
-  const handleSendMessage = async () => {
-    if (!inputValue.trim()) return
+  // const handleSendMessage = async () => {
+  //   if (!inputValue.trim()) return
 
-    const userMessage: TextMessage = {
-      id: Date.now().toString(),
+  //   const userMessage: TextMessage = {
+  //     id: Date.now().toString(),
+  //     type: "text",
+  //     content: inputValue,
+  //     role: "user",
+  //     timestamp: new Date(),
+  //   }
+
+  //   setMessages((prev) => [...prev, userMessage])
+  //   const currentInput = inputValue
+  //   setInputValue("")
+  //   setIsLoading(true)
+  //   setShowChat(true)
+
+  //   // 위치 관련 쿼리인지 확인
+  //   if (isLocationQuery(currentInput)) {
+  //     const locationQuery = extractLocationFromMessage(currentInput)
+  //     const locationResult = await searchLocation(locationQuery)
+
+  //     if (locationResult) {
+  //       // 지도 메시지 생성
+  //       const mapMessage: MapMessage = {
+  //         id: (Date.now() + 1).toString(),
+  //         type: "map",
+  //         role: "assistant",
+  //         location: locationResult,
+  //         content: `${locationResult.name}의 위치를 찾았습니다.`,
+  //         timestamp: new Date(),
+  //       }
+
+  //       setTimeout(() => {
+  //         setMessages((prev) => [...prev, mapMessage])
+  //         setIsLoading(false)
+  //       }, 1000)
+  //       return
+  //     }
+  //   }
+
+  //   // 일반 AI 응답
+  //   setTimeout(() => {
+  //     const aiMessage: TextMessage = {
+  //       id: (Date.now() + 1).toString(),
+  //       type: "text",
+  //       content:
+  //         "안녕하세요! 프로젝트에 대해 궁금한 것이 있으시면 언제든 물어보세요. 위치를 찾고 싶으시면 '강남역 지도' 같은 형태로 말씀해 주세요!",
+  //       role: "assistant",
+  //       timestamp: new Date(),
+  //     }
+  //     setMessages((prev) => [...prev, aiMessage])
+  //     setIsLoading(false)
+  //   }, 1000)
+  // }
+
+  
+  // Fast API 요청 가능한 함수(ing)
+  const handleSendMessage = async () => {
+  if (!inputValue.trim()) return
+
+  const userMessage: TextMessage = {
+    id: Date.now().toString(),
+    type: "text",
+    content: inputValue,
+    role: "user",
+    timestamp: new Date(),
+  }
+
+  setMessages((prev) => [...prev, userMessage])
+  setInputValue("")
+  setIsLoading(true)
+  setShowChat(true)
+
+  try {
+    const response = await sendToStartAPI(userMessage.content)
+
+    if (response.error) {
+      throw new Error(response.error)
+    }
+
+    const aiMessage: TextMessage = {
+      id: (Date.now() + 1).toString(),
       type: "text",
-      content: inputValue,
-      role: "user",
+      content: response.chat_reply,
+      role: "assistant",
       timestamp: new Date(),
     }
 
-    setMessages((prev) => [...prev, userMessage])
-    const currentInput = inputValue
-    setInputValue("")
-    setIsLoading(true)
-    setShowChat(true)
-
-    // 위치 관련 쿼리인지 확인
-    if (isLocationQuery(currentInput)) {
-      const locationQuery = extractLocationFromMessage(currentInput)
-      const locationResult = await searchLocation(locationQuery)
-
-      if (locationResult) {
-        // 지도 메시지 생성
-        const mapMessage: MapMessage = {
-          id: (Date.now() + 1).toString(),
-          type: "map",
-          role: "assistant",
-          location: locationResult,
-          content: `${locationResult.name}의 위치를 찾았습니다.`,
-          timestamp: new Date(),
-        }
-
-        setTimeout(() => {
-          setMessages((prev) => [...prev, mapMessage])
-          setIsLoading(false)
-        }, 1000)
-        return
-      }
-    }
-
-    // 일반 AI 응답
-    setTimeout(() => {
-      const aiMessage: TextMessage = {
+    setMessages((prev) => [...prev, aiMessage])
+  } catch (err: any) {
+    setMessages((prev) => [
+      ...prev,
+      {
         id: (Date.now() + 1).toString(),
         type: "text",
-        content:
-          "안녕하세요! 프로젝트에 대해 궁금한 것이 있으시면 언제든 물어보세요. 위치를 찾고 싶으시면 '강남역 지도' 같은 형태로 말씀해 주세요!",
+        content: `❌ 오류 발생: ${err.message}`,
         role: "assistant",
         timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, aiMessage])
-      setIsLoading(false)
-    }, 1000)
+      },
+    ])
+  } finally {
+    setIsLoading(false)
   }
+}
 
   const handleSuggestionClick = (suggestion: string) => {
     setInputValue(suggestion)
