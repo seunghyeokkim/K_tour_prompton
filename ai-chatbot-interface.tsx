@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { ChatMessage } from "./components/chat-message"
 import { searchLocation, isLocationQuery, extractLocationFromMessage } from "./utils/location-service"
 import type { Message, TextMessage, MapMessage } from "./types/chat"
+import axios from "axios"
 
 export default function AIChatbotInterface() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -79,6 +80,47 @@ export default function AIChatbotInterface() {
       setMessages((prev) => [...prev, aiMessage])
       setIsLoading(false)
     }, 1000)
+
+    // 분기 예시
+    let apiUrl = ""
+    if (currentInput.includes("장소 추천")) {
+      apiUrl = "http://localhost:8000/recommend/place"
+    } else if (currentInput.includes("경로 추천")) {
+      apiUrl = "http://localhost:8000/recommend/route"
+    } else {
+      apiUrl = "http://localhost:8000/location/extract"
+    }
+
+    try {
+      const res = await axios.post(apiUrl, {
+        user_message: currentInput,
+        // 필요시 session_id도 같이 넘길 수 있음
+      })
+      // res.data를 활용해서 챗봇 메시지로 추가
+      // 예시:
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          type: "text",
+          content: JSON.stringify(res.data), // 실제로는 예쁘게 파싱해서 보여주기
+          role: "assistant",
+          timestamp: new Date(),
+        },
+      ])
+    } catch (e) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          type: "text",
+          content: "서버와 통신 중 오류가 발생했습니다.",
+          role: "assistant",
+          timestamp: new Date(),
+        },
+      ])
+    }
+    setIsLoading(false)
   }
 
   const handleSuggestionClick = (suggestion: string) => {
