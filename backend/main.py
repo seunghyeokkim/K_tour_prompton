@@ -87,7 +87,6 @@ def extract_location(data: extract_loaction_UserRequest):
         return {"error": f"⚠️ 예외 발생: {e}"}
 
 # ========================== ② 장소 추천 ==========================
-
 @app.post("/recommend/place")
 def recommend_place(data: recommend_place_UserRequest):
     print(f"🏃 장소 추천 요청")
@@ -151,51 +150,51 @@ def recommend_place(data: recommend_place_UserRequest):
         print(f"⚠️ 예외 발생: {e}")
         return {"error": f"⚠️ 예외 발생: {e}"}
 
-# ========================== ③ 경로 추천 ==========================
+# # ========================== ③ 경로 추천 ==========================
 
-@app.post("/recommend/route")
-def recommend_route(data: UserRequest):
-    print(f"🗺️ 경로 추천 요청")
-    print(f"👤 사용자 메시지: {data.user_message}")
+# @app.post("/recommend/route")
+# def recommend_route(data: UserRequest):
+#     print(f"🗺️ 경로 추천 요청")
+#     print(f"👤 사용자 메시지: {data.user_message}")
 
-    response = chat.send_message(
-        data.user_message,
-        "2ffd2d2c883494acba2768e9b02b3a8e018117b24480a0d099275485b795ed5e"
-    )
+#     response = chat.send_message(
+#         data.user_message,
+#         "2ffd2d2c883494acba2768e9b02b3a8e018117b24480a0d099275485b795ed5e"
+#     )
 
-    try:
-        content = extract_assistant_response(response)
-        print(f"✅ 경로 추천 완료")
-        return {
-            "route_recommendation": content,
-            "conversation_length": len(chat.get_conversation_history()),
-            "success": True
-        }
-    except Exception as e:
-        print(f"⚠️ 예외 발생: {e}")
-        return {"error": f"⚠️ 예외 발생: {e}"}
+#     try:
+#         content = extract_assistant_response(response)
+#         print(f"✅ 경로 추천 완료")
+#         return {
+#             "route_recommendation": content,
+#             "conversation_length": len(chat.get_conversation_history()),
+#             "success": True
+#         }
+#     except Exception as e:
+#         print(f"⚠️ 예외 발생: {e}")
+#         return {"error": f"⚠️ 예외 발생: {e}"}
 
-# ========================== ④ 일반 대화 ==========================
+# # ========================== ④ 일반 대화 ==========================
 
-@app.post("/chat/general")
-def general_chat(data: UserRequest):
-    print(f"💬 일반 대화 요청")
-    print(f"👤 사용자 메시지: {data.user_message}")
+# @app.post("/chat/general")
+# def general_chat(data: UserRequest):
+#     print(f"💬 일반 대화 요청")
+#     print(f"👤 사용자 메시지: {data.user_message}")
 
-    response = chat.send_message(
-        data.user_message,
-        "2ffd2d2c883494acba2768e9b02b3a8e018117b24480a0d099275485b795ed5e"
-    )
+#     response = chat.send_message(
+#         data.user_message,
+#         "2ffd2d2c883494acba2768e9b02b3a8e018117b24480a0d099275485b795ed5e"
+#     )
 
-    try:
-        content = extract_assistant_response(response)
-        return {
-            "response": content,
-            "conversation_length": len(chat.get_conversation_history()),
-            "success": True
-        }
-    except Exception as e:
-        return {"error": f"⚠️ 예외 발생: {e}"}
+#     try:
+#         content = extract_assistant_response(response)
+#         return {
+#             "response": content,
+#             "conversation_length": len(chat.get_conversation_history()),
+#             "success": True
+#         }
+#     except Exception as e:
+#         return {"error": f"⚠️ 예외 발생: {e}"}
 
 # ========================== 상태 확인 ==========================
 

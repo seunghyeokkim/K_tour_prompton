@@ -7,7 +7,7 @@ load_dotenv()
 # 환경 변수 선언
 HASH_LOCATION = os.getenv("HASH_LOCATION")
 HASH_PLACE = os.getenv("HASH_PLACE")
-LAAS_API_KEY = os.getenv("Laas_API_KEY")
+LAAS_API_KEY = os.getenv("LAAS_API_KEY")
 PROJECT_CODE = os.getenv("PROJECT_CODE")
 LAAS_URL = os.getenv("LAAS_URL")
 # (선택) 경로 체크
