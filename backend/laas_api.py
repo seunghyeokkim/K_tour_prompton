@@ -36,7 +36,6 @@ class MultiTurnChat:
                 if 'choices' in response_data and len(response_data['choices']) > 0:
                     assistant_message = response_data['choices'][0]['message']['content']
                     self.add_message("assistant", assistant_message)
-                    print(f"Assistant: {assistant_message}")
                 else:
                     print("No assistant message received.")
             else:
@@ -84,7 +83,6 @@ class MultiTurnChat:
                 if 'choices' in response_data and len(response_data['choices']) > 0:
                     assistant_message = response_data['choices'][0]['message']['content']
                     self.add_message("assistant", assistant_message)
-                    print(f"Assistant: {assistant_message}")
                 else:
                     print("No response from assistant")
             else:
