@@ -8,7 +8,11 @@ class MultiTurnChat:
         self.api_key = LAAS_API_KEY
         self.project_code = PROJECT_CODE
         self.conversation_history = []  # 대화 히스토리 저장
+<<<<<<< HEAD
         self.laas_chat_url = LAAS_URL  # LaaS API URL
+=======
+        self.laas_chat_url = LAAS_URL  
+>>>>>>> origin/kshcode
         self.headers = {
             "project": self.project_code,
             "apiKey": self.api_key,
@@ -122,4 +126,8 @@ class MultiTurnChat:
         except FileNotFoundError:
             print(f"File {filename} not found.")
         except json.JSONDecodeError:
+<<<<<<< HEAD
             print(f"Invalid JSON in {filename}")
+=======
+            print(f"Invalid JSON in {filename}")
+>>>>>>> origin/kshcode

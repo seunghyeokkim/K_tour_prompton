@@ -27,7 +27,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         >
           {message.type === "text" ? (
             <div className="px-4 py-3">
-              <p className="text-sm leading-relaxed">{message.content}</p>
+              <p className="text-sm leading-relaxed" style={{ whiteSpace: "pre-line" }}>{message.content}</p>
             </div>
           ) : message.type === "map" ? (
             <div>

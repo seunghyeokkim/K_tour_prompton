@@ -1,20 +1,27 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, useEffect } from "react"
 import { Sparkles, Send, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ChatMessage } from "./components/chat-message"
-import { searchLocation, isLocationQuery, extractLocationFromMessage } from "./utils/location-service"
-import type { Message, TextMessage, MapMessage } from "./types/chat"
-import axios from "axios"
+import type { Message, TextMessage } from "./types/chat"
+import {
+  extractLocationAPI,
+  recommendPlaceAPI,
+  recommendRouteAPI,
+  LocationExtractResponse,
+  RecommendPlaceResponse,
+  RecommendRouteResponse
+} from "./utils/api"
 
 export default function AIChatbotInterface() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [recommended, setRecommended] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [showChat, setShowChat] = useState(false)
 
@@ -43,77 +50,62 @@ export default function AIChatbotInterface() {
     setIsLoading(true)
     setShowChat(true)
 
-    // 위치 관련 쿼리인지 확인
-    if (isLocationQuery(currentInput)) {
-      const locationQuery = extractLocationFromMessage(currentInput)
-      const locationResult = await searchLocation(locationQuery)
-
-      if (locationResult) {
-        // 지도 메시지 생성
-        const mapMessage: MapMessage = {
-          id: (Date.now() + 1).toString(),
-          type: "map",
-          role: "assistant",
-          location: locationResult,
-          content: `${locationResult.name}의 위치를 찾았습니다.`,
-          timestamp: new Date(),
-        }
-
-        setTimeout(() => {
-          setMessages((prev) => [...prev, mapMessage])
-          setIsLoading(false)
-        }, 1000)
-        return
-      }
-    }
-
-    // === 여기서부터 백엔드 연동 ===
-    let apiUrl = ""
-    if (currentInput.includes("장소 추천")) {
-      apiUrl = "http://localhost:8000/recommend/place"
-    } else if (currentInput.includes("경로 추천")) {
-      apiUrl = "http://localhost:8000/recommend/route"
-    } else {
-      apiUrl = "http://localhost:8000/location/extract"
-    }
-
     try {
-      const res = await axios.post(apiUrl, {
-        user_message: currentInput,
-      })
+      if (!recommended) {
+        // 장소 추천 요청
+        const extractRes: LocationExtractResponse = await extractLocationAPI(currentInput);
+        const { area, sigungu, message } = extractRes;
 
-      let content = ""
-      if (apiUrl.includes("/recommend/place") && res.data.recommended_places) {
-        content = res.data.recommended_places
-          .map(
-            (item: any) =>
-              `• ${item.title} (${item.address})\n${item.overview}`
-          )
-          .join("\n\n")
-      } else if (apiUrl.includes("/recommend/route") && res.data.route_recommendation) {
-        content = res.data.route_recommendation
-      } else if (apiUrl.includes("/location/extract")) {
-        if (res.data.area && res.data.sigungu) {
-          content = `지역: ${res.data.area}\n시군구: ${res.data.sigungu}`
-        } else if (res.data.message) {
-          content = res.data.message
+        if (area && sigungu) {
+          console.log("recommendPlaceAPI 호출", area, sigungu, `${area} ${sigungu} 플로깅 장소 추천`);
+          const recommendRes: RecommendPlaceResponse = await recommendPlaceAPI(
+            `${area} ${sigungu} 플로깅 장소 추천`,
+            area,
+            sigungu
+          );
+          const placeContent = recommendRes.chat_reply || "추천 결과가 없습니다.";
+
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              type: "text",
+              content: placeContent,
+              role: "assistant",
+              timestamp: new Date(),
+            },
+          ])
+          setRecommended(true)
         } else {
-          content = JSON.stringify(res.data)
+          let content = message || "지역 정보를 인식하지 못했습니다.";
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              type: "text",
+              content,
+              role: "assistant",
+              timestamp: new Date(),
+            },
+          ])
         }
       } else {
-        content = JSON.stringify(res.data)
-      }
+        // 장소 선택 후 경로 추천 요청
+        const routeRes: RecommendRouteResponse = await recommendRouteAPI(currentInput);
+        const routeContent = routeRes.route_recommendation || "경로 추천 결과가 없습니다.";
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          type: "text",
-          content,
-          role: "assistant",
-          timestamp: new Date(),
-        },
-      ])
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: "text",
+            content: routeContent,
+            role: "assistant",
+            timestamp: new Date(),
+          },
+        ])
+        setRecommended(false)
+      }
     } catch (e) {
       setMessages((prev) => [
         ...prev,
@@ -144,149 +136,120 @@ export default function AIChatbotInterface() {
     setMessages([])
     setShowChat(false)
     setInputValue("")
+    setRecommended(false)
   }
 
-  if (showChat && messages.length > 0) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-[#ff86e1]/20 via-[#89bcff]/10 to-white flex flex-col">
-        {/* Header */}
-        <div className="bg-white/80 backdrop-blur-sm border-b border-white/50 p-4">
-          <div className="max-w-4xl mx-auto flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={resetChat} className="text-[#456288] hover:bg-[#ff86e1]/10">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-[#ff86e1] to-[#89bcff] rounded-full flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold text-[#160211]">AI Assistant</h1>
-                <p className="text-sm text-[#56637e]">프로젝트에 대해 무엇이든 물어보세요</p>
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#ff86e1]/20 via-[#89bcff]/10 to-white flex flex-col">
+      {showChat && messages.length > 0 ? (
+        <>
+          <div className="bg-white/80 backdrop-blur-sm border-b border-white/50 p-4">
+            <div className="max-w-4xl mx-auto flex items-center gap-4">
+              <Button variant="ghost" size="icon" onClick={resetChat} className="text-[#456288] hover:bg-[#ff86e1]/10">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-[#ff86e1] to-[#89bcff] rounded-full flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-semibold text-[#160211]">AI Assistant</h1>
+                  <p className="text-sm text-[#56637e]">프로젝트에 대해 무엇이든 물어보세요</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="max-w-4xl mx-auto">
-            {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
-            ))}
-
-            {isLoading && (
-              <div className="flex gap-3 justify-start mb-6">
-                <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-[#ff86e1] to-[#89bcff] rounded-full flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-white" />
-                </div>
-                <div className="bg-white/80 backdrop-blur-sm border border-white/50 rounded-2xl px-4 py-3">
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-[#56637e] rounded-full animate-bounce"></div>
-                    <div
-                      className="w-2 h-2 bg-[#56637e] rounded-full animate-bounce"
-                      style={{ animationDelay: "0.1s" }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-[#56637e] rounded-full animate-bounce"
-                      style={{ animationDelay: "0.2s" }}
-                    ></div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="max-w-4xl mx-auto">
+              {messages.map((message) => (
+                <ChatMessage key={message.id} message={message} />
+              ))}
+              {isLoading && (
+                <div className="flex gap-3 justify-start mb-6">
+                  <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-[#ff86e1] to-[#89bcff] rounded-full flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="bg-white/80 backdrop-blur-sm border border-white/50 rounded-2xl px-4 py-3">
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 bg-[#56637e] rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-[#56637e] rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
+                      <div className="w-2 h-2 bg-[#56637e] rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
+              )}
+              <div ref={messagesEndRef} />
+            </div>
           </div>
-        </div>
 
-        {/* Input */}
-        <div className="bg-white/80 backdrop-blur-sm border-t border-white/50 p-4">
-          <div className="max-w-4xl mx-auto">
+          <div className="bg-white/80 backdrop-blur-sm border-t border-white/50 p-4">
+            <div className="max-w-4xl mx-auto">
+              <div className="relative">
+                <Input
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="메시지를 입력하세요..."
+                  className="w-full h-12 pl-4 pr-12 text-base bg-white/80 backdrop-blur-sm border-2 border-[#ff86e1]/20 rounded-xl focus:border-[#ff86e1]/40 focus:ring-0 placeholder:text-[#56637e] text-[#160211]"
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!inputValue.trim() || isLoading}
+                  size="icon"
+                  className="absolute right-1 top-1 h-10 w-10 bg-[#456288] hover:bg-[#56637e] rounded-lg disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4 text-white" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="w-full max-w-4xl mx-auto space-y-12 flex flex-col items-center justify-center p-6">
+          <div className="text-center space-y-6">
+            <div className="flex justify-center">
+              <Sparkles className="w-12 h-12 text-[#160211]" />
+            </div>
+            <h1 className="text-4xl md:text-5xl font-medium text-[#160211]">AI 플로깅 도우미에게 무엇이든 물어보세요</h1>
+          </div>
+
+          <div className="space-y-6">
+            <h2 className="text-lg text-[#56637e] font-medium">AI에게 이런 걸 물어볼 수 있어요</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div onClick={() => handleSuggestionClick("내 주변 플로깅 명소 추천해줘")} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/50 shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-105">
+                <p className="text-[#160211] font-medium">내 주변 플로깅 명소 추천해줘</p>
+              </div>
+              <div onClick={() => handleSuggestionClick("서울 강남구에서 플로깅하기 좋은 코스 알려줘")} className="bg-gradient-to-br from-[#ff86e1]/30 to-[#89bcff]/20 backdrop-blur-sm rounded-2xl p-6 border border-[#ff86e1]/30 shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-105">
+                <p className="text-[#160211] font-medium">서울 강남구에서 플로깅하기 좋은 코스 알려줘</p>
+              </div>
+              <div onClick={() => handleSuggestionClick("플로깅이 뭔지 설명해줘")} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/50 shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-105">
+                <p className="text-[#160211] font-medium">플로깅이 뭔지 설명해줘</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="w-full max-w-3xl mx-auto">
             <div className="relative">
               <Input
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="메시지를 입력하세요..."
-                className="w-full h-12 pl-4 pr-12 text-base bg-white/80 backdrop-blur-sm border-2 border-[#ff86e1]/20 rounded-xl focus:border-[#ff86e1]/40 focus:ring-0 placeholder:text-[#56637e] text-[#160211]"
+                placeholder="플로깅, 명소, 코스 등 궁금한 것을 입력해보세요"
+                className="w-full h-14 pl-6 pr-14 text-lg bg-white/80 backdrop-blur-sm border-2 border-[#ff86e1]/20 rounded-2xl focus:border-[#ff86e1]/40 focus:ring-0 placeholder:text-[#56637e] text-[#160211]"
               />
               <Button
                 onClick={handleSendMessage}
-                disabled={!inputValue.trim() || isLoading}
+                disabled={!inputValue.trim()}
                 size="icon"
-                className="absolute right-1 top-1 h-10 w-10 bg-[#456288] hover:bg-[#56637e] rounded-lg disabled:opacity-50"
+                className="absolute right-2 top-2 h-10 w-10 bg-[#456288] hover:bg-[#56637e] rounded-xl disabled:opacity-50"
               >
-                <Send className="w-4 h-4 text-white" />
+                <Send className="w-5 h-5 text-white" />
               </Button>
             </div>
           </div>
         </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-[#ff86e1]/20 via-[#89bcff]/10 to-white flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-4xl mx-auto space-y-12">
-        {/* Header with sparkle icon */}
-        <div className="text-center space-y-6">
-          <div className="flex justify-center">
-            <Sparkles className="w-12 h-12 text-[#160211]" />
-          </div>
-          <h1 className="text-4xl md:text-5xl font-medium text-[#160211]">AI 플로깅 도우미에게 무엇이든 물어보세요</h1>
-        </div>
-
-        {/* Suggestions section */}
-        <div className="space-y-6">
-          <h2 className="text-lg text-[#56637e] font-medium">AI에게 이런 걸 물어볼 수 있어요</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Suggestion card 1 */}
-            <div
-              onClick={() => handleSuggestionClick("내 주변 플로깅 명소 추천해줘")}
-              className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/50 shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-105"
-            >
-              <p className="text-[#160211] font-medium">내 주변 플로깅 명소 추천해줘</p>
-            </div>
-
-            {/* Suggestion card 2 - highlighted */}
-            <div
-              onClick={() => handleSuggestionClick("서울 강남구에서 플로깅하기 좋은 코스 알려줘")}
-              className="bg-gradient-to-br from-[#ff86e1]/30 to-[#89bcff]/20 backdrop-blur-sm rounded-2xl p-6 border border-[#ff86e1]/30 shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-105"
-            >
-              <p className="text-[#160211] font-medium">서울 강남구에서 플로깅하기 좋은 코스 알려줘</p>
-            </div>
-
-            {/* Suggestion card 3 */}
-            <div
-              onClick={() => handleSuggestionClick("플로깅이 뭔지 설명해줘")}
-              className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/50 shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-105"
-            >
-              <p className="text-[#160211] font-medium">플로깅이 뭔지 설명해줘</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Input section */}
-        <div className="w-full max-w-3xl mx-auto">
-          <div className="relative">
-            <Input
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="플로깅, 명소, 코스 등 궁금한 것을 입력해보세요"
-              className="w-full h-14 pl-6 pr-14 text-lg bg-white/80 backdrop-blur-sm border-2 border-[#ff86e1]/20 rounded-2xl focus:border-[#ff86e1]/40 focus:ring-0 placeholder:text-[#56637e] text-[#160211]"
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim()}
-              size="icon"
-              className="absolute right-2 top-2 h-10 w-10 bg-[#456288] hover:bg-[#56637e] rounded-xl disabled:opacity-50"
-            >
-              <Send className="w-5 h-5 text-white" />
-            </Button>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   )
 }
