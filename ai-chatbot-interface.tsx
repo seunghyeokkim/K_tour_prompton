@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ChatMessage } from "./components/chat-message"
 import { searchLocation, isLocationQuery, extractLocationFromMessage } from "./utils/location-service"
-import { sendToStartAPI } from "./utils/api"
 import type { Message, TextMessage, MapMessage } from "./types/chat"
+import axios from "axios"
 
 export default function AIChatbotInterface() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -26,111 +26,108 @@ export default function AIChatbotInterface() {
     scrollToBottom()
   }, [messages])
 
-  // const handleSendMessage = async () => {
-  //   if (!inputValue.trim()) return
-
-  //   const userMessage: TextMessage = {
-  //     id: Date.now().toString(),
-  //     type: "text",
-  //     content: inputValue,
-  //     role: "user",
-  //     timestamp: new Date(),
-  //   }
-
-  //   setMessages((prev) => [...prev, userMessage])
-  //   const currentInput = inputValue
-  //   setInputValue("")
-  //   setIsLoading(true)
-  //   setShowChat(true)
-
-  //   // 위치 관련 쿼리인지 확인
-  //   if (isLocationQuery(currentInput)) {
-  //     const locationQuery = extractLocationFromMessage(currentInput)
-  //     const locationResult = await searchLocation(locationQuery)
-
-  //     if (locationResult) {
-  //       // 지도 메시지 생성
-  //       const mapMessage: MapMessage = {
-  //         id: (Date.now() + 1).toString(),
-  //         type: "map",
-  //         role: "assistant",
-  //         location: locationResult,
-  //         content: `${locationResult.name}의 위치를 찾았습니다.`,
-  //         timestamp: new Date(),
-  //       }
-
-  //       setTimeout(() => {
-  //         setMessages((prev) => [...prev, mapMessage])
-  //         setIsLoading(false)
-  //       }, 1000)
-  //       return
-  //     }
-  //   }
-
-  //   // 일반 AI 응답
-  //   setTimeout(() => {
-  //     const aiMessage: TextMessage = {
-  //       id: (Date.now() + 1).toString(),
-  //       type: "text",
-  //       content:
-  //         "안녕하세요! 프로젝트에 대해 궁금한 것이 있으시면 언제든 물어보세요. 위치를 찾고 싶으시면 '강남역 지도' 같은 형태로 말씀해 주세요!",
-  //       role: "assistant",
-  //       timestamp: new Date(),
-  //     }
-  //     setMessages((prev) => [...prev, aiMessage])
-  //     setIsLoading(false)
-  //   }, 1000)
-  // }
-
-  
-  // Fast API 요청 가능한 함수(ing)
   const handleSendMessage = async () => {
-  if (!inputValue.trim()) return
+    if (!inputValue.trim()) return
 
-  const userMessage: TextMessage = {
-    id: Date.now().toString(),
-    type: "text",
-    content: inputValue,
-    role: "user",
-    timestamp: new Date(),
-  }
-
-  setMessages((prev) => [...prev, userMessage])
-  setInputValue("")
-  setIsLoading(true)
-  setShowChat(true)
-
-  try {
-    const response = await sendToStartAPI(userMessage.content)
-
-    if (response.error) {
-      throw new Error(response.error)
-    }
-
-    const aiMessage: TextMessage = {
-      id: (Date.now() + 1).toString(),
+    const userMessage: TextMessage = {
+      id: Date.now().toString(),
       type: "text",
-      content: response.chat_reply,
-      role: "assistant",
+      content: inputValue,
+      role: "user",
       timestamp: new Date(),
     }
 
-    setMessages((prev) => [...prev, aiMessage])
-  } catch (err: any) {
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: (Date.now() + 1).toString(),
-        type: "text",
-        content: `❌ 오류 발생: ${err.message}`,
-        role: "assistant",
-        timestamp: new Date(),
-      },
-    ])
-  } finally {
+    setMessages((prev) => [...prev, userMessage])
+    const currentInput = inputValue
+    setInputValue("")
+    setIsLoading(true)
+    setShowChat(true)
+
+    // 위치 관련 쿼리인지 확인
+    if (isLocationQuery(currentInput)) {
+      const locationQuery = extractLocationFromMessage(currentInput)
+      const locationResult = await searchLocation(locationQuery)
+
+      if (locationResult) {
+        // 지도 메시지 생성
+        const mapMessage: MapMessage = {
+          id: (Date.now() + 1).toString(),
+          type: "map",
+          role: "assistant",
+          location: locationResult,
+          content: `${locationResult.name}의 위치를 찾았습니다.`,
+          timestamp: new Date(),
+        }
+
+        setTimeout(() => {
+          setMessages((prev) => [...prev, mapMessage])
+          setIsLoading(false)
+        }, 1000)
+        return
+      }
+    }
+
+    // === 여기서부터 백엔드 연동 ===
+    let apiUrl = ""
+    if (currentInput.includes("장소 추천")) {
+      apiUrl = "http://localhost:8000/recommend/place"
+    } else if (currentInput.includes("경로 추천")) {
+      apiUrl = "http://localhost:8000/recommend/route"
+    } else {
+      apiUrl = "http://localhost:8000/location/extract"
+    }
+
+    try {
+      const res = await axios.post(apiUrl, {
+        user_message: currentInput,
+      })
+
+      let content = ""
+      if (apiUrl.includes("/recommend/place") && res.data.recommended_places) {
+        content = res.data.recommended_places
+          .map(
+            (item: any) =>
+              `• ${item.title} (${item.address})\n${item.overview}`
+          )
+          .join("\n\n")
+      } else if (apiUrl.includes("/recommend/route") && res.data.route_recommendation) {
+        content = res.data.route_recommendation
+      } else if (apiUrl.includes("/location/extract")) {
+        if (res.data.area && res.data.sigungu) {
+          content = `지역: ${res.data.area}\n시군구: ${res.data.sigungu}`
+        } else if (res.data.message) {
+          content = res.data.message
+        } else {
+          content = JSON.stringify(res.data)
+        }
+      } else {
+        content = JSON.stringify(res.data)
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          type: "text",
+          content,
+          role: "assistant",
+          timestamp: new Date(),
+        },
+      ])
+    } catch (e) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          type: "text",
+          content: "서버와 통신 중 오류가 발생했습니다.",
+          role: "assistant",
+          timestamp: new Date(),
+        },
+      ])
+    }
     setIsLoading(false)
   }
-}
 
   const handleSuggestionClick = (suggestion: string) => {
     setInputValue(suggestion)
@@ -235,36 +232,36 @@ export default function AIChatbotInterface() {
           <div className="flex justify-center">
             <Sparkles className="w-12 h-12 text-[#160211]" />
           </div>
-          <h1 className="text-4xl md:text-5xl font-medium text-[#160211]">Ask our AI anything</h1>
+          <h1 className="text-4xl md:text-5xl font-medium text-[#160211]">AI 플로깅 도우미에게 무엇이든 물어보세요</h1>
         </div>
 
         {/* Suggestions section */}
         <div className="space-y-6">
-          <h2 className="text-lg text-[#56637e] font-medium">Suggestions on what to ask Our AI</h2>
+          <h2 className="text-lg text-[#56637e] font-medium">AI에게 이런 걸 물어볼 수 있어요</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Suggestion card 1 */}
             <div
-              onClick={() => handleSuggestionClick("What can I ask you to do?")}
+              onClick={() => handleSuggestionClick("내 주변 플로깅 명소 추천해줘")}
               className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/50 shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-105"
             >
-              <p className="text-[#160211] font-medium">What can I ask you to do?</p>
+              <p className="text-[#160211] font-medium">내 주변 플로깅 명소 추천해줘</p>
             </div>
 
             {/* Suggestion card 2 - highlighted */}
             <div
-              onClick={() => handleSuggestionClick("Which one of my projects is performing the best?")}
+              onClick={() => handleSuggestionClick("서울 강남구에서 플로깅하기 좋은 코스 알려줘")}
               className="bg-gradient-to-br from-[#ff86e1]/30 to-[#89bcff]/20 backdrop-blur-sm rounded-2xl p-6 border border-[#ff86e1]/30 shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-105"
             >
-              <p className="text-[#160211] font-medium">Which one of my projects is performing the best?</p>
+              <p className="text-[#160211] font-medium">서울 강남구에서 플로깅하기 좋은 코스 알려줘</p>
             </div>
 
             {/* Suggestion card 3 */}
             <div
-              onClick={() => handleSuggestionClick("What projects should I be concerned about right now?")}
+              onClick={() => handleSuggestionClick("플로깅이 뭔지 설명해줘")}
               className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/50 shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-105"
             >
-              <p className="text-[#160211] font-medium">What projects should I be concerned about right now?</p>
+              <p className="text-[#160211] font-medium">플로깅이 뭔지 설명해줘</p>
             </div>
           </div>
         </div>
@@ -276,7 +273,7 @@ export default function AIChatbotInterface() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Ask me anything about your projects"
+              placeholder="플로깅, 명소, 코스 등 궁금한 것을 입력해보세요"
               className="w-full h-14 pl-6 pr-14 text-lg bg-white/80 backdrop-blur-sm border-2 border-[#ff86e1]/20 rounded-2xl focus:border-[#ff86e1]/40 focus:ring-0 placeholder:text-[#56637e] text-[#160211]"
             />
             <Button
