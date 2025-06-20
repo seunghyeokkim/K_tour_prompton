@@ -177,3 +177,4 @@ def clear_session(session_id: str):
         del chat_sessions[session_id]
         return {"message": "세션 삭제 완료", "session_id": session_id}
     return {"error": "❌ 세션이 존재하지 않습니다"}
+

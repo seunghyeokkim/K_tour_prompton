@@ -7,9 +7,9 @@ load_dotenv()
 # 환경 변수 선언
 HASH_LOCATION = os.getenv("HASH_LOCATION")
 HASH_PLACE = os.getenv("HASH_PLACE")
-API_KEY = os.getenv("API_KEY")
+LaaS_API_KEY = os.getenv("Laas_API_KEY")
 PROJECT_CODE = os.getenv("PROJECT_CODE")
 
 # (선택) 경로 체크
-if not all([HASH_LOCATION, HASH_PLACE, API_KEY, PROJECT_CODE]):
+if not all([HASH_LOCATION, HASH_PLACE, LaaS_API_KEY, PROJECT_CODE]):
     print("⚠️ 일부 환경변수가 설정되지 않았습니다.")
