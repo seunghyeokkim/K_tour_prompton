@@ -6,6 +6,7 @@ from tour_api import get_filtered_tourist_data, get_detailed_tourist_data
 from laas_api import MultiTurnChat
 import json
 import uvicorn
+from config import HASH_LOCATION, HASH_PLACE
 
 app = FastAPI()
 
@@ -22,9 +23,14 @@ chat = MultiTurnChat()
 
 # ========================== 모델 정의 ==========================
 
-class UserRequest(BaseModel):
+class extract_loaction_UserRequest(BaseModel):
     user_message: str
 
+class recommend_place_UserRequest(BaseModel):
+    user_message: str
+    area_name: str
+    sigungu_name: str
+    
 class ChatMessage(BaseModel):
     role: str  # "user" or "assistant"
     content: str
@@ -44,13 +50,13 @@ def extract_assistant_response(response) -> str:
 # ========================== ① 지역 추출 ==========================
 
 @app.post("/location/extract")
-def extract_location(data: UserRequest):
+def extract_location(data: extract_loaction_UserRequest):
     print(f"👤 사용자 메시지: {data.user_message}")
     print(f"📊 현재 대화 기록: {chat.get_conversation_history()}")
 
     response = chat.send_message(
         data.user_message,
-        "9cf7cad215551390ac4363685aac8e0c1c69175e27ca3e09b604f799ba04dd35"
+        HASH_LOCATION
     )
 
     try:
@@ -83,7 +89,7 @@ def extract_location(data: UserRequest):
 # ========================== ② 장소 추천 ==========================
 
 @app.post("/recommend/place")
-def recommend_place(data: UserRequest):
+def recommend_place(data: recommend_place_UserRequest):
     print(f"🏃 장소 추천 요청")
     print(f"👤 사용자 메시지: {data.user_message}")
 

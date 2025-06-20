@@ -1,12 +1,14 @@
 import requests
+import config
+from config import LAAS_URL, PROJECT_CODE, LAAS_API_KEY
 from typing import List, Dict, Any
 
 class MultiTurnChat:
     def __init__(self, api_key: str = None, project_code: str = None):
-        self.api_key = "5f4c07f58cf66be3a43d3808e287c22b2f9e4a8c7f7611c40160367a808e4f13"
-        self.project_code = "KNTO-PROMPTON-118"
+        self.api_key = "LAAS_API_KEY"
+        self.project_code = "PROJECT_CODE"
         self.conversation_history = []  # 대화 히스토리 저장
-        self.laas_chat_url = "https://api-laas.wanted.co.kr/api/preset/v2/chat/completions"
+        self.laas_chat_url = "LaaS_URL"  
         self.headers = {
             "project": self.project_code,
             "apiKey": self.api_key,
@@ -121,45 +123,3 @@ class MultiTurnChat:
             print(f"File {filename} not found.")
         except json.JSONDecodeError:
             print(f"Invalid JSON in {filename}")
-
-# # 사용 예시
-# if __name__ == "__main__":
-#     # 멀티턴 채팅 인스턴스 생성
-#     chat = MultiTurnChat(hash="your_hash_here")
-    
-#     # 대화 시작
-#     print("=== 멀티턴 대화 시작 ===")
-    
-#     # 첫 번째 메시지
-#     chat.send_message("안녕하세요! 파이썬에 대해 질문이 있습니다.")
-    
-#     # 두 번째 메시지 (이전 대화 맥락 유지)
-#     chat.send_message("리스트와 튜플의 차이점을 설명해주세요.")
-    
-#     # 세 번째 메시지 (계속해서 맥락 유지)
-#     chat.send_message("그럼 언제 리스트를 사용하고 언제 튜플을 사용하는게 좋나요?")
-    
-#     # 대화 히스토리 확인
-#     print("\n=== 대화 히스토리 ===")
-#     for i, message in enumerate(chat.get_conversation_history()):
-#         print(f"{i+1}. {message['role']}: {message['content']}")
-    
-#     # 이미지와 함께 메시지 보내기
-#     print("\n=== 이미지와 함께 메시지 ===")
-#     chat.send_message_with_image(
-#         "이 이미지에 대해 설명해주세요.",
-#         "https://static.wanted.co.kr/images/wdes/0_4.d217341b.jpg"
-#     )
-    
-#     # 대화 저장
-#     chat.save_conversation("conversation_history.json")
-
-# 간단한 사용을 위한 함수들
-
-def create_chat_session(hash: str) -> MultiTurnChat:
-    """새로운 채팅 세션 생성"""
-    return MultiTurnChat(hash)
-
-def continue_conversation(chat: MultiTurnChat, message: str):
-    """기존 대화 세션에서 메시지 보내기"""
-    return chat.send_message(message)
