@@ -67,21 +67,7 @@ export default function AIChatbotInterface() {
       }
     }
 
-    // 일반 AI 응답
-    setTimeout(() => {
-      const aiMessage: TextMessage = {
-        id: (Date.now() + 1).toString(),
-        type: "text",
-        content:
-          "안녕하세요! 프로젝트에 대해 궁금한 것이 있으시면 언제든 물어보세요. 위치를 찾고 싶으시면 '강남역 지도' 같은 형태로 말씀해 주세요!",
-        role: "assistant",
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, aiMessage])
-      setIsLoading(false)
-    }, 1000)
-
-    // 분기 예시
+    // === 여기서부터 백엔드 연동 ===
     let apiUrl = ""
     if (currentInput.includes("장소 추천")) {
       apiUrl = "http://localhost:8000/recommend/place"
@@ -94,16 +80,36 @@ export default function AIChatbotInterface() {
     try {
       const res = await axios.post(apiUrl, {
         user_message: currentInput,
-        // 필요시 session_id도 같이 넘길 수 있음
       })
-      // res.data를 활용해서 챗봇 메시지로 추가
-      // 예시:
+
+      let content = ""
+      if (apiUrl.includes("/recommend/place") && res.data.recommended_places) {
+        content = res.data.recommended_places
+          .map(
+            (item: any) =>
+              `• ${item.title} (${item.address})\n${item.overview}`
+          )
+          .join("\n\n")
+      } else if (apiUrl.includes("/recommend/route") && res.data.route_recommendation) {
+        content = res.data.route_recommendation
+      } else if (apiUrl.includes("/location/extract")) {
+        if (res.data.area && res.data.sigungu) {
+          content = `지역: ${res.data.area}\n시군구: ${res.data.sigungu}`
+        } else if (res.data.message) {
+          content = res.data.message
+        } else {
+          content = JSON.stringify(res.data)
+        }
+      } else {
+        content = JSON.stringify(res.data)
+      }
+
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now().toString(),
           type: "text",
-          content: JSON.stringify(res.data), // 실제로는 예쁘게 파싱해서 보여주기
+          content,
           role: "assistant",
           timestamp: new Date(),
         },
@@ -226,36 +232,36 @@ export default function AIChatbotInterface() {
           <div className="flex justify-center">
             <Sparkles className="w-12 h-12 text-[#160211]" />
           </div>
-          <h1 className="text-4xl md:text-5xl font-medium text-[#160211]">Ask our AI anything</h1>
+          <h1 className="text-4xl md:text-5xl font-medium text-[#160211]">AI 플로깅 도우미에게 무엇이든 물어보세요</h1>
         </div>
 
         {/* Suggestions section */}
         <div className="space-y-6">
-          <h2 className="text-lg text-[#56637e] font-medium">Suggestions on what to ask Our AI</h2>
+          <h2 className="text-lg text-[#56637e] font-medium">AI에게 이런 걸 물어볼 수 있어요</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Suggestion card 1 */}
             <div
-              onClick={() => handleSuggestionClick("What can I ask you to do?")}
+              onClick={() => handleSuggestionClick("내 주변 플로깅 명소 추천해줘")}
               className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/50 shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-105"
             >
-              <p className="text-[#160211] font-medium">What can I ask you to do?</p>
+              <p className="text-[#160211] font-medium">내 주변 플로깅 명소 추천해줘</p>
             </div>
 
             {/* Suggestion card 2 - highlighted */}
             <div
-              onClick={() => handleSuggestionClick("Which one of my projects is performing the best?")}
+              onClick={() => handleSuggestionClick("서울 강남구에서 플로깅하기 좋은 코스 알려줘")}
               className="bg-gradient-to-br from-[#ff86e1]/30 to-[#89bcff]/20 backdrop-blur-sm rounded-2xl p-6 border border-[#ff86e1]/30 shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-105"
             >
-              <p className="text-[#160211] font-medium">Which one of my projects is performing the best?</p>
+              <p className="text-[#160211] font-medium">서울 강남구에서 플로깅하기 좋은 코스 알려줘</p>
             </div>
 
             {/* Suggestion card 3 */}
             <div
-              onClick={() => handleSuggestionClick("What projects should I be concerned about right now?")}
+              onClick={() => handleSuggestionClick("플로깅이 뭔지 설명해줘")}
               className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/50 shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-105"
             >
-              <p className="text-[#160211] font-medium">What projects should I be concerned about right now?</p>
+              <p className="text-[#160211] font-medium">플로깅이 뭔지 설명해줘</p>
             </div>
           </div>
         </div>
@@ -267,7 +273,7 @@ export default function AIChatbotInterface() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Ask me anything about your projects"
+              placeholder="플로깅, 명소, 코스 등 궁금한 것을 입력해보세요"
               className="w-full h-14 pl-6 pr-14 text-lg bg-white/80 backdrop-blur-sm border-2 border-[#ff86e1]/20 rounded-2xl focus:border-[#ff86e1]/40 focus:ring-0 placeholder:text-[#56637e] text-[#160211]"
             />
             <Button
