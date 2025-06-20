@@ -1,11 +1,10 @@
 // API 호출 함수들
-export const extractLocationAPI = async (message: string, sessionId?: string) => {
+export const extractLocationAPI = async (message: string) => {
   const response = await fetch('http://localhost:8000/location/extract', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ 
-      user_message: message,
-      session_id: sessionId 
+      user_message: message
     })
   })
   
@@ -23,13 +22,12 @@ export const extractLocationAPI = async (message: string, sessionId?: string) =>
   return response.json()
 }
 
-export const recommendPlaceAPI = async (message: string, sessionId?: string) => {
+export const recommendPlaceAPI = async (message: string) => {
   const response = await fetch('http://localhost:8000/recommend/place', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ 
-      user_message: message,
-      session_id: sessionId 
+      user_message: message
     })
   })
   
@@ -47,13 +45,12 @@ export const recommendPlaceAPI = async (message: string, sessionId?: string) => 
   return response.json()
 }
 
-export const recommendRouteAPI = async (message: string, sessionId: string) => {
+export const recommendRouteAPI = async (message: string) => {
   const response = await fetch('http://localhost:8000/recommend/route', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ 
-      user_message: message,
-      session_id: sessionId 
+      user_message: message
     })
   })
   
@@ -114,7 +111,6 @@ export const clearSession = async (sessionId: string) => {
 
 // TypeScript 타입 정의 (선택사항)
 export interface LocationExtractResponse {
-  session_id: string
   area?: string
   sigungu?: string
   raw_response?: string
@@ -130,7 +126,6 @@ export interface RecommendedPlace {
 }
 
 export interface RecommendPlaceResponse {
-  session_id: string
   recommended_places?: RecommendedPlace[]
   chat_reply?: string
   message?: string
@@ -138,19 +133,11 @@ export interface RecommendPlaceResponse {
 }
 
 export interface RecommendRouteResponse {
-  session_id: string
   route_recommendation?: string
   error?: string
 }
 
 export interface ChatHistoryResponse {
-  session_id: string
   history?: any[]
-  error?: string
-}
-
-export interface ClearSessionResponse {
-  message?: string
-  session_id?: string
   error?: string
 }
