@@ -6,7 +6,7 @@ from tour_api import get_filtered_tourist_data, get_detailed_tourist_data
 from laas_api import MultiTurnChat
 import json
 import uvicorn
-from config import HASH_LOCATION, HASH_PLACE
+from config import HASH_LOCATION, HASH_PLACE, HASH_ROUTE
 
 app = FastAPI()
 
@@ -20,7 +20,7 @@ app.add_middleware(
 
 # 전역 챗 설정 (멀티턴 형식)
 chat = MultiTurnChat()
-
+ 
 # ========================== 모델 정의 ==========================
 
 class extract_loaction_UserRequest(BaseModel):
@@ -36,7 +36,7 @@ class ChatMessage(BaseModel):
     content: str
 
 # ========================== 유틸 함수 ==========================
-
+# 1. 어시스턴트 응답 추출
 def extract_assistant_response(response) -> str:
     try:
         if response and response.status_code == 200:
@@ -45,6 +45,43 @@ def extract_assistant_response(response) -> str:
                 return response_data['choices'][0]['message']['content']
     except Exception as e:
         print(f"⚠️ 응답 파싱 실패: {e}")
+    return None
+# 2. 사용자 선택 장소 추출
+def extract_user_pick_place(response) -> str:
+    """
+    LaaS 응답에서 'user_pick_place' 값을 추출합니다.
+    (tool_calls 기반 함수 호출 응답을 처리함)
+    """
+    try:
+        if response and response.status_code == 200:
+            response_data = response.json()
+            choices = response_data.get("choices", [])
+            if choices:
+                tool_calls = choices[0]["message"].get("tool_calls", [])
+                if tool_calls:
+                    arguments_str = tool_calls[0]["function"]["arguments"]
+                    arguments = json.loads(arguments_str)
+                    return arguments.get("user_pick_place")
+    except Exception as e:
+        print(f"⚠️ user_pick_place 파싱 실패: {e}")
+    return None
+
+
+# 3. 경로 정보 추출
+def extract_route_location(response) -> Optional[dict]:
+    try:
+        if response and response.status_code == 200:
+            response_data = response.json()
+            if 'route' in response_data:
+                route = response_data['route']
+                return {
+                    "start": route.get("start"),
+                    "end": route.get("end"),
+                    "distance": route.get("distance"),
+                    "time": route.get("time")
+                }
+    except Exception as e:
+        print(f"⚠️ 경로 정보 추출 실패: {e}")
     return None
 
 # ========================== ① 지역 추출 ==========================
@@ -91,69 +128,147 @@ def extract_location(data: extract_loaction_UserRequest):
 def recommend_place(data: recommend_place_UserRequest):
     print(f"🏃 장소 추천 요청")
     print(f"👤 사용자 메시지: {data.user_message}")
+    print(f"📊 현재 대화 기록: {chat.get_conversation_history()}")
+    
+    user_input = data.user_message.strip()
 
-    location_response = chat.send_message(
-        f"지역 추출: {data.user_message}",
-        "9cf7cad215551390ac4363685aac8e0c1c69175e27ca3e09b604f799ba04dd35"
-    )
+    # ✅ 입력이 명확한 지역명일 경우 바로 처리 (예: "서울특별시 강남구")
+    if " " in user_input and any(s in user_input for s in ["시", "도", "군", "구"]):
+        # 관광지 검색 및 추천
+        try:
+            # 지역명에 따라서 Tour API에서 관광지 데이터 추출 (현재 50개)
+            candidates = get_filtered_tourist_data(data.area_name, data.sigungu_name)
+            chat.set_candidates(candidates)  # 후보 리스트 저장
+            print(f"🔍 찾은 관광지 수: {len(candidates)}")
 
-    try:
-        location_content = extract_assistant_response(location_response)
-        parsed = json.loads(location_content)
-        area_name = parsed.get("광역시/도")
-        sigungu_name = parsed.get("시/군/구")
+            if not candidates:
+                return {
+                    "message": f"⚠️ {data.area_name} {data.sigungu_name}에서 추천할 수 있는 플로깅 장소를 찾지 못했습니다.",
+                    "conversation_length": len(chat.get_conversation_history())
+                }
+            places_text = "\n".join([f"- {item['title']}: {item['address']}" for item in candidates])
 
-        print(f"📍 지역 정보 확인: {area_name} {sigungu_name}")
+            recommendation_response = chat.send_message(
+                f"{data.area_name} {data.sigungu_name}의 플로깅 장소 추천 요청",
+                HASH_PLACE,
+                {"recommended_place": places_text}
+            )
 
-        candidates = get_filtered_tourist_data(area_name, sigungu_name)
-        print(f"🔍 찾은 관광지 수: {len(candidates)}")
+            recommendation_content = extract_assistant_response(recommendation_response)
 
-        if not candidates:
+            print(f"✅ 장소 추천 완료: {len(candidates)}개 장소")
+
             return {
-                "message": f"⚠️ {area_name} {sigungu_name}에서 추천할 수 있는 플로깅 장소를 찾지 못했습니다.",
-                "conversation_length": len(chat.get_conversation_history())
+                "recommended_places": candidates,
+                "chat_reply": recommendation_content,
+                "area": data.area_name,
+                "sigungu": data.sigungu_name,
+                "conversation_length": len(chat.get_conversation_history()),
+                "success": True
             }
-
-        brief_candidates = []
-        for item in candidates:
-            if not item.get("overview"):
-                details = get_detailed_tourist_data(item["contentid"])
-                item["overview"] = details.get("overview", "")[:300] if details else ""
-            brief_candidates.append({
-                "title": item["title"],
-                "overview": item["overview"].split(". ")[0] + "." if item.get("overview") else "상세 정보가 없습니다.",
-                "address": item.get("address", "주소 정보 없음")
-            })
-
-        places_text = "\n".join([f"- {item['title']}: {item['address']}" for item in brief_candidates])
-
-        recommendation_response = chat.send_message(
-            f"{area_name} {sigungu_name}의 플로깅 장소 추천 요청",
-            "2ffd2d2c883494acba2768e9b02b3a8e018117b24480a0d099275485b795ed5e",
-            {"recommended_place": places_text}
+        
+        except Exception as e:
+            print(f"⚠️ 예외 발생: {e}")
+            return {"error": f"⚠️ 예외 발생: {e}"}
+    else:
+        # ✅ 복잡한 요청은 LaaS에 지역 추출 요청
+        user_pick_response = chat.send_message(
+            user_input,
+            HASH_PLACE,
+            {}
         )
+        print("📦 LaaS 응답 내용:")
+        user_pick_place = extract_user_pick_place(user_pick_response)
+        
+        # ✅ 사용자가 선택한 장소가 존재할 경우 경로 계산
+        if user_pick_place:
+            print(f"🎯 사용자가 선택한 장소: {user_pick_place}")
+            
+            candidates = chat.get_candidates()
+            # 시작점 정보 추출
+            start_point = next((item for item in candidates if item["title"] == user_pick_place), None)
+            if not start_point:
+                return {"error": f"⚠️ 선택한 장소 '{user_pick_place}'를 후보 목록에서 찾을 수 없습니다."}
 
-        recommendation_content = extract_assistant_response(recommendation_response)
+            start_x = float(start_point["mapx"])
+            start_y = float(start_point["mapy"])
 
-        print(f"✅ 장소 추천 완료: {len(brief_candidates)}개 장소")
+            def euclidean_distance(item):
+                try:
+                    dx = float(item["mapx"]) - start_x
+                    dy = float(item["mapy"]) - start_y
+                    return (dx**2 + dy**2) ** 0.5
+                except Exception:
+                    return float("inf")  # 좌표 오류시 큰 거리 부여
 
-        return {
-            "recommended_places": brief_candidates,
-            "chat_reply": recommendation_content,
-            "area": area_name,
-            "sigungu": sigungu_name,
-            "conversation_length": len(chat.get_conversation_history()),
-            "success": True
-        }
+            # 시작점을 제외한 후보 중 거리 가까운 순 4개 선택
+            nearby_candidates = sorted(
+                [item for item in candidates if item["title"] != user_pick_place],
+                key=euclidean_distance
+            )[:4]
 
-    except Exception as e:
-        print(f"⚠️ 예외 발생: {e}")
-        return {"error": f"⚠️ 예외 발생: {e}"}
+            # 최종 경로 리스트 (시작점 + 웨이포인트)
+            final_route = [start_point] + nearby_candidates
+
+            # 필요한 정보만 추출하여 반환
+            route_summary = [
+                {
+                    "title": item["title"],
+                    "mapx": item["mapx"],
+                    "mapy": item["mapy"],
+                    "address": item["address"]
+                } for item in final_route
+            ]
+            print("📍 최종 추천 경로:")
+            for i, item in enumerate(route_summary):
+                if i == 0:
+                    step = "출발지"
+                elif i == len(route_summary) - 1:
+                    step = "도착지"
+                else:
+                    step = f"경유지 {i}"
+                print(f"{step}: {item['title']} (x: {item['mapx']}, y: {item['mapy']})")
+            
+            plain_text_lines = []
+
+            for i, item in enumerate(route_summary):
+                step = ""
+                if i == 0:
+                    step = " (출발지)"
+                elif i == len(route_summary) - 1:
+                    step = " (도착지)"
+                
+                line = f"{i+1}.{item['title']}: {item['address']}{step}"
+                plain_text_lines.append(line)
+
+            route_text = "\n".join(plain_text_lines)
+            
+            print(f"📜 추천 경로 요약:\n{route_text}")
+            recommendation_response = chat.send_message(
+                "플로깅 루트 추천 요청",
+                HASH_ROUTE,
+                {"recommended_route": route_text}
+            )
+            
+            recommendation_content = extract_assistant_response(recommendation_response)
+            print(f"🤖 어시스턴트 응답: \n {recommendation_response}")
+            
+            return {
+                "chat_reply": recommendation_content,
+                "user_pick_place": user_pick_place,
+                "recommended_route": route_summary,
+                "conversation_length": len(chat.get_conversation_history()),
+                "success": True
+            }
+            
+        else:
+            return {"error": "❌ user_pick_place 값을 추출하지 못했습니다."}
+
 
 # # ========================== ③ 경로 추천 ==========================
 
 # @app.post("/recommend/route")
-# def recommend_route(data: UserRequest):
+# def recommend_route(data: recommend_place_UserRequest):
 #     print(f"🗺️ 경로 추천 요청")
 #     print(f"👤 사용자 메시지: {data.user_message}")
 
@@ -177,7 +292,7 @@ def recommend_place(data: recommend_place_UserRequest):
 # # ========================== ④ 일반 대화 ==========================
 
 # @app.post("/chat/general")
-# def general_chat(data: UserRequest):
+# def general_chat(data: recommend_place_UserRequest):
 #     print(f"💬 일반 대화 요청")
 #     print(f"👤 사용자 메시지: {data.user_message}")
 
@@ -196,7 +311,7 @@ def recommend_place(data: recommend_place_UserRequest):
 #     except Exception as e:
 #         return {"error": f"⚠️ 예외 발생: {e}"}
 
-# ========================== 상태 확인 ==========================
+#========================== 상태 확인 ==========================
 
 @app.get("/")
 def root():

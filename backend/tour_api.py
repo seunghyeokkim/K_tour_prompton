@@ -51,7 +51,9 @@ def get_filtered_tourist_data(area_name: str, sigungu_name: str) -> list[dict]:
             "title": item.get("title"),
             "address": item.get("addr1"),
             "contentid": item.get("contentid"),
-            "overview": item.get("overview", "")[:300]
+            "overview": item.get("overview", "")[:300],
+            "mapx": item.get("mapx", ""),
+            "mapy": item.get("mapy", "")
         }
         for item in items
         if item.get("contenttypeid") in {"12", "14", "28"}
@@ -61,6 +63,7 @@ def get_filtered_tourist_data(area_name: str, sigungu_name: str) -> list[dict]:
     return random.sample(items, 50) if len(items) >= 50 else items
 
 
+# 상세 관광지 정보 조회 함수 --> 필요 없을 것 같지만, 나중에 필요할 수도 있으니 남겨둠
 def get_detailed_tourist_data(content_id: str) -> dict:
     url = "http://apis.data.go.kr/B551011/KorService2/detailCommon2"
     params = {
@@ -82,58 +85,3 @@ def get_detailed_tourist_data(content_id: str) -> dict:
         print("❌ 상세 관광지 정보 조회 오류:", e)
         return {}
 
-# def place_recommend_agent(state):
-#     user_input = state.get("user_input", "")
-#     area_name, sigungu_name = extract_location(user_input)
-#     print(f"📍 디버깅: 추출된 지역명: {area_name}, 시군구명: {sigungu_name}")
-
-#     if not area_name or not sigungu_name or area_name not in AREA_CODE_DICT:
-#         return {**state, "place_list": []}
-
-#     candidates = get_filtered_tourist_data(area_name, sigungu_name)
-#     print(f"📍 디버깅: 후보 관광지 수: {len(candidates)}")
-
-#     brief_candidates = []
-#     for item in candidates:
-#         if not item['overview']:
-#             details = get_detailed_tourist_data(item['contentid'])
-#             if details.get('overview'):
-#                 item['overview'] = details['overview'][:300]
-#         brief_candidates.append({
-#             "title": item["title"],
-#             "overview": item["overview"].split(". ")[0] + "." if item["overview"] else ""
-#         })
-
-#     print("📍 디버깅: 요약된 관광지 목록 예시:")
-#     for c in brief_candidates[:3]:
-#         print(f"- {c['title']}: {c['overview']}")
-
-#     prompt = ChatPromptTemplate.from_template("""
-#     아래는 {area_name} {sigungu_name} 지역의 관광지 목록입니다. 이 중 플로깅 투어에 적합한
-#     장소를 3~5곳 골라 추천해 주세요. 플로깅은 조깅을 하면서 길가의 쓰레기를 수거하는, 체육활동과 자연보호활동이 합쳐진 개념을 의미하는 신조어야.
-#     각 장소에 대해 간단한 소개를 덧붙여 주세요.
-
-#     관광지 목록:
-#     {places}
-
-#     출력 형식:
-#     - 장소명: 설명
-#     """)
-
-#     chain = prompt | llm
-#     response = chain.invoke({
-#         "area_name": area_name,
-#         "sigungu_name": sigungu_name,
-#         "places": str(brief_candidates)
-#     }).content
-
-#     results = []
-#     for line in response.split("\n"):
-#         if ':' in line:
-#             title, desc = line.split(":", 1)
-#             results.append({
-#                 "title": title.strip("- ").strip(),
-#                 "description": desc.strip()
-#             })
-
-#     return {**state, "place_list": results}

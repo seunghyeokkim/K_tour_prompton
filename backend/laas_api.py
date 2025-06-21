@@ -8,11 +8,8 @@ class MultiTurnChat:
         self.api_key = LAAS_API_KEY
         self.project_code = PROJECT_CODE
         self.conversation_history = []  # 대화 히스토리 저장
-<<<<<<< HEAD
+        self.candidates = []
         self.laas_chat_url = LAAS_URL  # LaaS API URL
-=======
-        self.laas_chat_url = LAAS_URL  
->>>>>>> origin/kshcode
         self.headers = {
             "project": self.project_code,
             "apiKey": self.api_key,
@@ -20,6 +17,9 @@ class MultiTurnChat:
         }
 
     def add_message(self, role: str, content: str):
+        if content is None:
+            print(f"⚠️ Skipped adding message because content is None (role: {role})")
+            return
         self.conversation_history.append({
             "role": role,
             "content": content
@@ -99,6 +99,12 @@ class MultiTurnChat:
         except Exception as e:
             print(f"An error occurred: {e}")
             return None
+        
+    def set_candidates(self, items: List[Dict[str, Any]]):
+        self.candidates = items
+
+    def get_candidates(self) -> List[Dict[str, Any]]:
+        return self.candidates
     
     def get_conversation_history(self) -> List[Dict[str, Any]]:
         """현재 대화 히스토리 반환"""
@@ -126,8 +132,4 @@ class MultiTurnChat:
         except FileNotFoundError:
             print(f"File {filename} not found.")
         except json.JSONDecodeError:
-<<<<<<< HEAD
             print(f"Invalid JSON in {filename}")
-=======
-            print(f"Invalid JSON in {filename}")
->>>>>>> origin/kshcode
