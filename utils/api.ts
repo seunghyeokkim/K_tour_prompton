@@ -22,7 +22,7 @@ export const extractLocationAPI = async (message: string) => {
   return response.json()
 }
 
-export const recommendPlaceAPI = async (message: string, area_name:string, sigungu_name:string) => {
+export const recommendPlaceAPI = async (message: string, area_name:string = "", sigungu_name:string = "") => {
   const response = await fetch('http://localhost:8000/recommend/place', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -91,15 +91,18 @@ export default function AIChatbotInterface() {
         }
       } else {
         // 장소 선택 후 경로 추천 요청
-        const routeRes: RecommendRouteResponse = await recommendRouteAPI(currentInput);
-        const routeContent = routeRes.route_recommendation || "경로 추천 결과가 없습니다.";
-
+        // const routeRes: RecommendRouteResponse = await recommendRouteAPI(currentInput);
+        // const routeContent = routeRes.route_recommendation || "경로 추천 결과가 없습니다.";
+        const recommendRes: RecommendPlaceResponse = await recommendPlaceAPI(
+            currentInput
+          );
+        const placeContent = recommendRes.chat_reply || "추천 결과가 없습니다.";
         setMessages((prev) => [
           ...prev,
           {
             id: Date.now().toString(),
             type: "text",
-            content: routeContent,
+            content: placeContent,
             role: "assistant",
             timestamp: new Date(),
           },
