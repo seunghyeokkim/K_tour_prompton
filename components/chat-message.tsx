@@ -1,6 +1,5 @@
 import { User, Bot, MapPin } from "lucide-react"
 import type { Message } from "../types/chat"
-import { TmapMap } from "./tmap-map"
 
 interface ChatMessageProps {
   message: Message
@@ -32,9 +31,16 @@ export function ChatMessage({ message }: ChatMessageProps) {
               </p>
             </div>
           ) : message.type === "map" ? (
-            <TmapMap route={message.route} height="300px" />
+            <iframe
+              src={`/tmap-frame.html?route=${encodeURIComponent(JSON.stringify(message.route))}`}
+              width="100%"
+              height="300px"
+              style={{ border: "none" }}
+              title="Tmap"
+            />
           ) : null}
         </div>
+
         <p className={`text-xs text-[#56637e] mt-1 ${isUser ? "text-right" : "text-left"}`}>
           {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </p>

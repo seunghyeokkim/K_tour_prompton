@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tmap Route</title>
+    <script src="https://apis.openapi.sk.com/tmap/jsv2?version=1&appKey=ECz1ZwyOcj91pngxWDBFr43NsbF7o2zUhwbQEYf3"></script>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map_div" style="width:100%; height:100%;"></div>
+    <script>
+      const route = (() => {
+        try {
+          const raw = new URLSearchParams(location.search).get("route");
+          return JSON.parse(decodeURIComponent(raw));
+        } catch {
+          return [];
+        }
+      })();
+
+      const appKey = "ECz1ZwyOcj91pngxWDBFr43NsbF7o2zUhwbQEYf3";
+
+      function initMap() {
+        if (!route || route.length < 2) return;
+
+        const start = route[0];
+        const end = route[route.length - 1];
+        const passList = route.slice(1, -1);
+
+        const map = new Tmapv2.Map("map_div", {
+          center: new Tmapv2.LatLng(start.mapy, start.mapx),
+          width: "100%",
+          height: "100%",
+          zoom: 15
+        });
+
+        // 마커 표시
+        route.forEach((point, i) => {
+          new Tmapv2.Marker({
+            position: new Tmapv2.LatLng(point.mapy, point.mapx),
+            map: map,
+            title: point.title
+          });
+        });
+
+        // 도보 경로 API 요청
+        const headers = { appKey };
+        const data = {
+          startX: start.mapx,
+          startY: start.mapy,
+          endX: end.mapx,
+          endY: end.mapy,
+          startName: start.title,
+          endName: end.title,
+          reqCoordType: "WGS84GEO",
+          resCoordType: "WGS84GEO",
+        };
+
+        if (passList.length > 0) {
+          data.passList = passList.map(p => `${p.mapx},${p.mapy}`).join("_");
+        }
+
+        fetch("https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1&format=json", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            appKey: appKey,
+          },
+          body: new URLSearchParams(data)
+        })
+          .then(res => res.json())
+          .then(json => {
+            const features = json.features;
+            const linePath = [];
+
+            features.forEach(f => {
+              if (f.geometry.type === "LineString") {
+                f.geometry.coordinates.forEach(coord => {
+                  const latLng = new Tmapv2.LatLng(coord[1], coord[0]);
+                  linePath.push(latLng);
+                });
+              }
+            });
+
+            new Tmapv2.Polyline({
+              path: linePath,
+              strokeColor: "#ff86e1",
+              strokeWeight: 5,
+              map: map
+            });
+          })
+          .catch(err => console.error("🚨 경로 API 오류:", err));
+      }
+
+      window.onload = initMap;
+    </script>
+  </body>
+</html>
