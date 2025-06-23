@@ -11,12 +11,12 @@ export interface TextMessage extends BaseMessage {
 
 export interface MapMessage extends BaseMessage {
   type: "map"
-  location: {
-    name: string
+  route: {
+    title: string
     address: string
-    lat: number
-    lng: number
-  }
+    mapx: number
+    mapy: number
+  }[]
   content?: string
 }
 

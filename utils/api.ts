@@ -132,6 +132,7 @@ export interface RecommendPlaceResponse {
   chat_reply?: string
   message?: string
   error?: string
+  recommended_route?: any[]
 }
 
 export interface RecommendRouteResponse {

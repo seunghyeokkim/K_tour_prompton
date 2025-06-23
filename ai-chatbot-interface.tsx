@@ -1,5 +1,6 @@
 "use client"
 
+import { v4 as uuidv4 } from "uuid"
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Sparkles, Send, ArrowLeft } from "lucide-react"
@@ -10,17 +11,14 @@ import type { Message, TextMessage } from "./types/chat"
 import {
   extractLocationAPI,
   recommendPlaceAPI,
-  recommendRouteAPI,
   LocationExtractResponse,
-  RecommendPlaceResponse,
-  RecommendRouteResponse
+  RecommendPlaceResponse
 } from "./utils/api"
 
 export default function AIChatbotInterface() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [sessionId, setSessionId] = useState<string | null>(null)
   const [recommended, setRecommended] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [showChat, setShowChat] = useState(false)
@@ -37,7 +35,7 @@ export default function AIChatbotInterface() {
     if (!inputValue.trim()) return
 
     const userMessage: TextMessage = {
-      id: Date.now().toString(),
+      id: uuidv4(),
       type: "text",
       content: inputValue,
       role: "user",
@@ -57,7 +55,6 @@ export default function AIChatbotInterface() {
         const { area, sigungu, message } = extractRes;
 
         if (area && sigungu) {
-          console.log("recommendPlaceAPI 호출", area, sigungu, `${area} ${sigungu} 플로깅 장소 추천`);
           const recommendRes: RecommendPlaceResponse = await recommendPlaceAPI(
             `${area} ${sigungu} 플로깅 장소 추천`,
             area,
@@ -68,7 +65,7 @@ export default function AIChatbotInterface() {
           setMessages((prev) => [
             ...prev,
             {
-              id: Date.now().toString(),
+              id: uuidv4(),
               type: "text",
               content: placeContent,
               role: "assistant",
@@ -77,11 +74,11 @@ export default function AIChatbotInterface() {
           ])
           setRecommended(true)
         } else {
-          let content = message || "지역 정보를 인식하지 못했습니다.";
+          const content = message || "지역 정보를 인식하지 못했습니다.";
           setMessages((prev) => [
             ...prev,
             {
-              id: Date.now().toString(),
+              id: uuidv4(),
               type: "text",
               content,
               role: "assistant",
@@ -90,30 +87,48 @@ export default function AIChatbotInterface() {
           ])
         }
       } else {
-        // 장소 선택 후 경로 추천 요청
-        // const routeRes: RecommendRouteResponse = await recommendRouteAPI(currentInput);
-        // const routeContent = routeRes.route_recommendation || "경로 추천 결과가 없습니다.";
-        const recommendRes: RecommendPlaceResponse = await recommendPlaceAPI(
-            currentInput
-          );
+        // 경로 추천 + 지도 메시지 삽입
+        const recommendRes: RecommendPlaceResponse = await recommendPlaceAPI(currentInput);
         const placeContent = recommendRes.chat_reply || "추천 결과가 없습니다.";
+
         setMessages((prev) => [
           ...prev,
           {
-            id: Date.now().toString(),
+            id: uuidv4(),
             type: "text",
             content: placeContent,
             role: "assistant",
             timestamp: new Date(),
           },
         ])
+
+        if (recommendRes.recommended_route) {
+          const parsedRoute = recommendRes.recommended_route.map((p: any) => ({
+            title: p.title,
+            address: p.address,
+            mapx: parseFloat(p.mapx),
+            mapy: parseFloat(p.mapy),
+          }));
+
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: uuidv4(),
+              type: "map",
+              role: "assistant",
+              timestamp: new Date(),
+              route: parsedRoute,
+            },
+          ]);
+        }
+
         setRecommended(false)
       }
     } catch (e) {
       setMessages((prev) => [
         ...prev,
         {
-          id: Date.now().toString(),
+          id: uuidv4(),
           type: "text",
           content: "서버와 통신 중 오류가 발생했습니다.",
           role: "assistant",
