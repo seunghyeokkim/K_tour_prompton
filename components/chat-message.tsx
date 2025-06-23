@@ -1,11 +1,6 @@
 import { User, Bot, MapPin } from "lucide-react"
-<<<<<<< HEAD
-import { NaverMap } from "./naver-map"
-import type { Message } from "../types/chat"
-=======
 import type { Message } from "../types/chat"
 import { TmapMap } from "./tmap-map"
->>>>>>> f58e32b (작업 내용에 대한 커밋 메시지)
 
 interface ChatMessageProps {
   message: Message
@@ -32,29 +27,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
         >
           {message.type === "text" ? (
             <div className="px-4 py-3">
-<<<<<<< HEAD
-              <p className="text-sm leading-relaxed" style={{ whiteSpace: "pre-line" }}>{message.content}</p>
-            </div>
-          ) : message.type === "map" ? (
-            <div>
-              {message.content && (
-                <div className="px-4 pt-3 pb-2">
-                  <p className="text-sm leading-relaxed">{message.content}</p>
-                </div>
-              )}
-              <div className="px-4 pb-3">
-                <div className="bg-white rounded-lg overflow-hidden">
-                  <NaverMap location={message.location} height="200px" />
-                </div>
-                <div className="mt-2 text-xs opacity-80">
-                  <p className="font-medium">{message.location.name}</p>
-                  <p>{message.location.address}</p>
-                </div>
-              </div>
-            </div>
-          ) : null}
-        </div>
-=======
               <p className="text-sm leading-relaxed" style={{ whiteSpace: "pre-line" }}>
                 {message.content}
               </p>
@@ -63,8 +35,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
             <TmapMap route={message.route} height="300px" />
           ) : null}
         </div>
-
->>>>>>> f58e32b (작업 내용에 대한 커밋 메시지)
         <p className={`text-xs text-[#56637e] mt-1 ${isUser ? "text-right" : "text-left"}`}>
           {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </p>
