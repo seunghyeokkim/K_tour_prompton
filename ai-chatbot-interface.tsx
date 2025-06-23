@@ -90,7 +90,8 @@ export default function AIChatbotInterface() {
         // 경로 추천 + 지도 메시지 삽입
         const recommendRes: RecommendPlaceResponse = await recommendPlaceAPI(currentInput);
         const placeContent = recommendRes.chat_reply || "추천 결과가 없습니다.";
-
+      
+        // 2단계 응답 텍스트
         setMessages((prev) => [
           ...prev,
           {
@@ -100,8 +101,9 @@ export default function AIChatbotInterface() {
             role: "assistant",
             timestamp: new Date(),
           },
-        ])
-
+        ]);
+      
+        // ✅ 3단계: 지도 삽입용 메시지
         if (recommendRes.recommended_route) {
           const parsedRoute = recommendRes.recommended_route.map((p: any) => ({
             title: p.title,
@@ -109,20 +111,21 @@ export default function AIChatbotInterface() {
             mapx: parseFloat(p.mapx),
             mapy: parseFloat(p.mapy),
           }));
-
+      
+          // 지도용 메시지 (iframe 렌더링됨)
           setMessages((prev) => [
             ...prev,
             {
               id: uuidv4(),
-              type: "map",
+              type: "map", // 👈 ChatMessage에서 iframe으로 처리됨
               role: "assistant",
               timestamp: new Date(),
               route: parsedRoute,
             },
           ]);
         }
-
-        setRecommended(false)
+      
+        setRecommended(false);
       }
     } catch (e) {
       setMessages((prev) => [
