@@ -16,7 +16,13 @@ export interface MapMessage extends BaseMessage {
     address: string
     mapx: number
     mapy: number
-  }[]
+  }[],
+  location: {
+    name: string
+    address: string
+    lat: number
+    lng: number
+  }
   content?: string
 }
 

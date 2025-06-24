@@ -1,5 +1,7 @@
 import { User, Bot, MapPin } from "lucide-react"
 import type { Message } from "../types/chat"
+import { NaverMap } from "./naver-map"  // ← NaverMap 컴포넌트 import 추가
+
 
 interface ChatMessageProps {
   message: Message
@@ -16,7 +18,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
         </div>
       )}
 
-      <div className={`max-w-[70%] ${isUser ? "order-first" : ""}`}>
+      <div
+          className={`${
+            message.type === "map" ? "max-w-full" : "max-w-[70%]"
+          } ${isUser ? "order-first" : ""}`}
+        >
         <div
           className={`rounded-2xl overflow-hidden ${
             isUser
@@ -31,13 +37,28 @@ export function ChatMessage({ message }: ChatMessageProps) {
               </p>
             </div>
           ) : message.type === "map" ? (
-            <iframe
-              src={`/tmap-frame.html?route=${encodeURIComponent(JSON.stringify(message.route))}`}
-              width="100%"
-              height="300px"
-              style={{ border: "none" }}
-              title="Tmap"
-            />
+            // <iframe
+            //   src={`/tmap-frame.html?route=${encodeURIComponent(JSON.stringify(message.route))}`}
+            //   width="600px"
+            //   height="400px"
+            //   style={{ border: "none" }}
+            //   title="Tmap"
+            // />
+            <div className="p-2">
+              <NaverMap 
+                route={message.route}
+                location={message.location} // 👈 필수 추가
+                pathOptions={{
+                  width: 6,
+                  color: '#ff86e1',
+                  outlineColor: '#89bcff',
+                  outlineWidth: 2,
+                  patternInterval: 20
+                }}
+                width="600px" 
+                height="400px" 
+              />
+            </div>
           ) : null}
         </div>
 

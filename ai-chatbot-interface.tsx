@@ -121,7 +121,12 @@ export default function AIChatbotInterface() {
               role: "assistant",
               timestamp: new Date(),
               route: parsedRoute,
-            },
+              location: {
+                name: "서울특별시청",
+                address: "서울 중구 세종대로 110",
+                lat: 37.5665,
+                lng: 126.9780
+              }}
           ]);
         }
       
