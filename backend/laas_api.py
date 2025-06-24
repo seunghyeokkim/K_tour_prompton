@@ -52,7 +52,7 @@ class MultiTurnChat:
             return None
 
     
-    def send_message_with_image(self, user_message: str, image_url: str) -> requests.Response:
+    def send_message_with_image(self, hash:str,user_message: str, image_url: str) -> requests.Response:
         """이미지와 함께 메시지 보내기"""
         # 이미지와 텍스트를 포함한 메시지 구성
         message_content = [
@@ -76,7 +76,7 @@ class MultiTurnChat:
         
         # 요청 데이터 구성
         data = {
-            "hash": self.hash,
+            "hash": hash,
             "params": {},
             "messages": self.conversation_history.copy()
         }

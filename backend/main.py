@@ -6,7 +6,7 @@ from tour_api import get_filtered_tourist_data, get_detailed_tourist_data
 from laas_api import MultiTurnChat
 import json
 import uvicorn
-from config import HASH_LOCATION, HASH_PLACE, HASH_ROUTE
+from config import HASH_LOCATION, HASH_PLACE, HASH_ROUTE, HASH_IMAGE
 
 app = FastAPI()
 
@@ -35,6 +35,9 @@ class ChatMessage(BaseModel):
     role: str  # "user" or "assistant"
     content: str
 
+class ImageChatRequest(BaseModel):
+    user_message: str
+    image_url: str    
 # ========================== 유틸 함수 ==========================
 # 1. 어시스턴트 응답 추출
 def extract_assistant_response(response) -> str:
@@ -84,6 +87,38 @@ def extract_route_location(response) -> Optional[dict]:
         print(f"⚠️ 경로 정보 추출 실패: {e}")
     return None
 
+# 4. 이미지 대화 응답 추출
+def extract_image_chat_response(response) -> str:
+    """
+    이미지 대화 응답에서 어시스턴트 메시지를 추출합니다.
+    """
+    try:
+        if response and response.status_code == 200:
+            response_data = response.json()
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                return response_data['choices'][0]['message']['content']
+    except Exception as e:
+        print(f"⚠️ 이미지 대화 응답 파싱 실패: {e}")
+    return None
+
+# 5. 이미지 URL 유효성 검사
+def validate_image_url(url: str) -> bool:
+    """
+    이미지 URL의 유효성을 간단히 검증합니다.
+    """
+    valid_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')
+    valid_schemes = ('http://', 'https://', 'data:image/')
+    
+    # URL 스키마 확인
+    if not any(url.startswith(scheme) for scheme in valid_schemes):
+        return False
+    
+    # data URL인 경우 별도 검증
+    if url.startswith('data:image/'):
+        return True
+    
+    # 일반 URL인 경우 확장자 확인
+    return any(url.lower().endswith(ext) for ext in valid_extensions)
 # ========================== ① 지역 추출 ==========================
 
 @app.post("/location/extract")
@@ -264,6 +299,65 @@ def recommend_place(data: recommend_place_UserRequest):
         else:
             return {"error": "❌ user_pick_place 값을 추출하지 못했습니다."}
 
+#  ========================== ④ 이미지 대화 ==========================
+
+@app.post("/chat/image")
+def image_chat(data: ImageChatRequest):
+    """
+    이미지와 함께 대화를 진행하는 엔드포인트
+    """
+    print(f"🖼️ 이미지 대화 요청")
+    print(f"👤 사용자 메시지: {data.user_message}")
+    print(f"🔗 이미지 URL: {data.image_url[:50]}...")
+    print(f"📊 현재 대화 기록: {len(chat.get_conversation_history())}개")
+
+    # 이미지 URL 유효성 검증
+    if not validate_image_url(data.image_url):
+        return {
+            "error": "⚠️ 올바르지 않은 이미지 URL 형식입니다. PNG, JPG, JPEG, GIF, BMP, WEBP 형식만 지원됩니다.",
+            "success": False
+        }
+
+    try:
+        
+        # 이미지와 함께 메시지 전송
+        response = chat.send_message_with_image(
+            hash=HASH_IMAGE,
+            user_message=data.user_message,
+            image_url=data.image_url
+        )
+
+        if response is None:
+            return {
+                "error": "⚠️ 이미지 대화 API 호출에 실패했습니다.",
+                "success": False
+            }
+
+        # 응답 추출
+        assistant_response = extract_image_chat_response(response)
+        
+        if assistant_response:
+            print(f"🤖 어시스턴트 응답: {assistant_response[:100]}...")
+            
+            return {
+                "chat_reply": assistant_response,
+                "conversation_length": len(chat.get_conversation_history()),
+                "image_processed": True,
+                "success": True
+            }
+        else:
+            return {
+                "error": "⚠️ 어시스턴트 응답을 추출할 수 없습니다.",
+                "raw_response": response.text if response else "No response",
+                "success": False
+            }
+            
+    except Exception as e:
+        print(f"⚠️ 이미지 대화 처리 중 예외 발생: {e}")
+        return {
+            "error": f"⚠️ 이미지 대화 처리 중 오류가 발생했습니다: {str(e)}",
+            "success": False
+        }
 
 # # ========================== ③ 경로 추천 ==========================
 
