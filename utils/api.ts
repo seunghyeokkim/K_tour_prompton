@@ -212,8 +212,6 @@ export interface ImageChatResponse {
   success: boolean
   error?: string
   raw_response?: string
-<<<<<<< HEAD
-=======
 }
 
 // 쓰레기 봉투 평가 API 함수
@@ -236,5 +234,4 @@ export const evaluateTrashbagAPI = async (prompt: string, imageBase64: string) =
   }
 
   return response.json()
->>>>>>> origin/kshcode
 }

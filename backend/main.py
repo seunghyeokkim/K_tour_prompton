@@ -219,6 +219,7 @@ def recommend_place(data: recommend_place_UserRequest):
         )
         print("📦 LaaS 응답 내용:")
         user_pick_place = extract_user_pick_place(user_pick_response)
+        print(user_pick_place.json())
         
         # ✅ 사용자가 선택한 장소가 존재할 경우 경로 계산
         if user_pick_place:

@@ -133,3 +133,30 @@ class MultiTurnChat:
             print(f"File {filename} not found.")
         except json.JSONDecodeError:
             print(f"Invalid JSON in {filename}")
+            
+def find_similar_documents_by_text(collection_code: str, api_key: str, project_code: str, text: str, limit: int, offset: int):
+    url = f"https://api-laas.wanted.co.kr/api/document/{collection_code}/similar/text"
+    headers = {
+        "Content-Type": "application/json",
+        "apiKey": api_key,
+        "project": project_code
+    }
+    data = {
+        "text": text,
+        "limit": limit,
+        "offset": offset
+    }
+    return requests.post(url, headers=headers, json=data)
+
+# if __name__ == '__main__':
+#     requsets_trash = find_similar_documents_by_text(
+#         collection_code="RAG",
+#         api_key=LAAS_API_KEY,
+#         project_code=PROJECT_CODE,
+#         text="서울 구로구 쓰레기통 위치",
+#         limit=20,
+#         offset=0
+#     )
+    
+#     print(requsets_trash.status_code)
+#     print(requsets_trash.json())
