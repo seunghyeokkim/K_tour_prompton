@@ -12,8 +12,16 @@ import {
   extractLocationAPI,
   recommendPlaceAPI,
   LocationExtractResponse,
+<<<<<<< HEAD
   RecommendPlaceResponse
 } from "./utils/api"
+=======
+  RecommendPlaceResponse,
+  imageChatAPI,
+  evaluateTrashbagAPI
+} from "./utils/api"
+import TrashImageUpload from "./components/TrashImageUpload"
+>>>>>>> origin/kshcode
 
 export default function AIChatbotInterface() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -126,7 +134,19 @@ export default function AIChatbotInterface() {
                 address: "서울 중구 세종대로 110",
                 lat: 37.5665,
                 lng: 126.9780
+<<<<<<< HEAD
               }}
+=======
+              }
+            },
+            {
+              id: uuidv4(),
+              type: "upload",
+              role: "assistant",
+              timestamp: new Date(),
+              content: "쓰레기 이미지를 업로드해주세요!"
+            }
+>>>>>>> origin/kshcode
           ]);
         }
       
@@ -165,6 +185,14 @@ export default function AIChatbotInterface() {
     setRecommended(false)
   }
 
+<<<<<<< HEAD
+=======
+  // 평가 API 호출 함수 추가
+  async function evaluateTrashbag(prompt: string, imageBase64: string) {
+    return await evaluateTrashbagAPI(prompt, imageBase64)
+  }
+
+>>>>>>> origin/kshcode
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#ff86e1]/20 via-[#89bcff]/10 to-white flex flex-col">
       {showChat && messages.length > 0 ? (
@@ -189,7 +217,65 @@ export default function AIChatbotInterface() {
           <div className="flex-1 overflow-y-auto p-4">
             <div className="max-w-4xl mx-auto">
               {messages.map((message) => (
+<<<<<<< HEAD
                 <ChatMessage key={message.id} message={message} />
+=======
+                <ChatMessage
+                  key={message.id}
+                  message={message}
+                  onUpload={
+                    message.type === "upload"
+                      ? async (file: File, previewUrl: string) => {
+                          // 업로드된 이미지를 채팅 메시지로 추가
+                          setMessages((prev) => [
+                            ...prev,
+                            {
+                              id: uuidv4(),
+                              type: "image",
+                              imageUrl: previewUrl,
+                              role: "user",
+                              timestamp: new Date(),
+                              content: "사용자 업로드 이미지"
+                            }
+                          ]);
+                          // 평가 안내 메시지 추가 (로딩)
+                          const evalMsgId = uuidv4();
+                          setMessages((prev) => [
+                            ...prev,
+                            {
+                              id: evalMsgId,
+                              type: "text",
+                              content: "쓰레기 봉투 평가 중...",
+                              role: "assistant",
+                              timestamp: new Date(),
+                            }
+                          ]);
+                          try {
+                            const prompt = "다음이 유저가 주는 쓰레기 봉투 이미지이다. 이 이미지를 보고 플로깅 성과를 평가해줘.";
+                            const result = await evaluateTrashbag(prompt, previewUrl);
+                            setMessages((prev) => prev.map(m =>
+                              m.id === evalMsgId
+                                ? {
+                                    ...m,
+                                    content: result.result || "평가 결과를 받아오지 못했습니다."
+                                  }
+                                : m
+                            ));
+                          } catch (e) {
+                            setMessages((prev) => prev.map(m =>
+                              m.id === evalMsgId
+                                ? {
+                                    ...m,
+                                    content: "평가 중 오류가 발생했습니다."
+                                  }
+                                : m
+                            ));
+                          }
+                        }
+                      : undefined
+                  }
+                />
+>>>>>>> origin/kshcode
               ))}
               {isLoading && (
                 <div className="flex gap-3 justify-start mb-6">

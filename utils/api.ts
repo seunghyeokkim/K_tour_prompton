@@ -212,4 +212,29 @@ export interface ImageChatResponse {
   success: boolean
   error?: string
   raw_response?: string
+<<<<<<< HEAD
+=======
+}
+
+// 쓰레기 봉투 평가 API 함수
+export const evaluateTrashbagAPI = async (prompt: string, imageBase64: string) => {
+  const response = await fetch('http://localhost:8000/evaluate/trashbag', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, image_base64: imageBase64 })
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`API 요청 실패 (${response.status}): ${errorText}`)
+  }
+
+  const contentType = response.headers.get('Content-Type')
+  if (!contentType || !contentType.includes('application/json')) {
+    const responseText = await response.text()
+    throw new Error(`JSON이 아닌 응답을 받았습니다: ${responseText.substring(0, 100)}...`)
+  }
+
+  return response.json()
+>>>>>>> origin/kshcode
 }

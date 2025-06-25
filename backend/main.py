@@ -6,7 +6,7 @@ from tour_api import get_filtered_tourist_data, get_detailed_tourist_data
 from laas_api import MultiTurnChat
 import json
 import uvicorn
-from config import HASH_LOCATION, HASH_PLACE, HASH_ROUTE, HASH_IMAGE
+from config import HASH_LOCATION, HASH_PLACE, HASH_ROUTE, HASH_IMAGE, HASH_TRASHBAG
 
 app = FastAPI()
 
@@ -38,6 +38,11 @@ class ChatMessage(BaseModel):
 class ImageChatRequest(BaseModel):
     user_message: str
     image_url: str    
+
+class TrashbagEvaluateRequest(BaseModel):
+    prompt: str
+    image_base64: str
+
 # ========================== 유틸 함수 ==========================
 # 1. 어시스턴트 응답 추출
 def extract_assistant_response(response) -> str:
@@ -359,51 +364,42 @@ def image_chat(data: ImageChatRequest):
             "success": False
         }
 
-# # ========================== ③ 경로 추천 ==========================
+# ========================== ⑤ 쓰봉판단 ==========================
 
-# @app.post("/recommend/route")
-# def recommend_route(data: recommend_place_UserRequest):
-#     print(f"🗺️ 경로 추천 요청")
-#     print(f"👤 사용자 메시지: {data.user_message}")
-
-#     response = chat.send_message(
-#         data.user_message,
-#         "2ffd2d2c883494acba2768e9b02b3a8e018117b24480a0d099275485b795ed5e"
-#     )
-
-#     try:
-#         content = extract_assistant_response(response)
-#         print(f"✅ 경로 추천 완료")
-#         return {
-#             "route_recommendation": content,
-#             "conversation_length": len(chat.get_conversation_history()),
-#             "success": True
-#         }
-#     except Exception as e:
-#         print(f"⚠️ 예외 발생: {e}")
-#         return {"error": f"⚠️ 예외 발생: {e}"}
-
-# # ========================== ④ 일반 대화 ==========================
-
-# @app.post("/chat/general")
-# def general_chat(data: recommend_place_UserRequest):
-#     print(f"💬 일반 대화 요청")
-#     print(f"👤 사용자 메시지: {data.user_message}")
-
-#     response = chat.send_message(
-#         data.user_message,
-#         "2ffd2d2c883494acba2768e9b02b3a8e018117b24480a0d099275485b795ed5e"
-#     )
-
-#     try:
-#         content = extract_assistant_response(response)
-#         return {
-#             "response": content,
-#             "conversation_length": len(chat.get_conversation_history()),
-#             "success": True
-#         }
-#     except Exception as e:
-#         return {"error": f"⚠️ 예외 발생: {e}"}
+@app.post("/evaluate/trashbag")
+def evaluate_trashbag(data: TrashbagEvaluateRequest):
+    """
+    플로깅 쓰봉판단 요청
+    - prompt: 프롬프트(지시문)
+    - image_base64: base64 인코딩 이미지
+    """
+    print(f"🗑️ 쓰봉판단 요청: {data.prompt[:30]}... (이미지 {len(data.image_base64)} bytes)")
+    try:
+        # LaaS API로 멀티모달 메시지 전송
+        message_content = [
+            {"type": "image_url", "image_url": {"url": data.image_base64}},
+            {"type": "text", "text": data.prompt}
+        ]
+        chat.conversation_history.append({"role": "user", "content": message_content})
+        req_data = {
+            "hash": HASH_TRASHBAG,
+            "params": {},
+            "messages": chat.conversation_history.copy()
+        }
+        response = chat.send_message(
+            user_message=data.prompt,
+            hash=HASH_TRASHBAG,
+            param=None
+        )
+        result = extract_assistant_response(response)
+        print(f"🤖 쓰봉판단 결과: {result}")
+        return {
+            "result": result,
+            "success": True
+        }
+    except Exception as e:
+        print(f"⚠️ 쓰봉판단 처리 중 예외: {e}")
+        return {"error": str(e), "success": False}
 
 #========================== 상태 확인 ==========================
 

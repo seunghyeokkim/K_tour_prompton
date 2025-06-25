@@ -26,4 +26,15 @@ export interface MapMessage extends BaseMessage {
   content?: string
 }
 
-export type Message = TextMessage | MapMessage
+export interface ImageMessage extends BaseMessage {
+  type: "image"
+  imageUrl: string
+  content?: string // 이미지에 대한 설명 등
+}
+
+export interface UploadMessage extends BaseMessage {
+  type: "upload"
+  content: string // 안내 문구
+}
+
+export type Message = TextMessage | MapMessage | ImageMessage | UploadMessage

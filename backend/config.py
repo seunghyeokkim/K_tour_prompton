@@ -13,6 +13,7 @@ LAAS_API_KEY = os.getenv("LAAS_API_KEY")
 PROJECT_CODE = os.getenv("PROJECT_CODE")
 LAAS_URL = os.getenv("LAAS_URL")
 TMAP_API_KEY = os.getenv("TMAP_API_KEY")
+HASH_TRASHBAG = os.getenv("HASH_TRASHBAG")
 # (선택) 경로 체크
 if not all([HASH_LOCATION, HASH_PLACE, HASH_ROUTE,HASH_IMAGE, LAAS_API_KEY, PROJECT_CODE, LAAS_URL, TMAP_API_KEY]):
     print("⚠️ 일부 환경변수가 설정되지 않았습니다.")

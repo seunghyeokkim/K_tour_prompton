@@ -1,13 +1,15 @@
 import { User, Bot, MapPin } from "lucide-react"
 import type { Message } from "../types/chat"
 import { NaverMap } from "./naver-map"  // ← NaverMap 컴포넌트 import 추가
+import TrashImageUpload from "./TrashImageUpload"
 
 
 interface ChatMessageProps {
   message: Message
+  onUpload?: (file: File, previewUrl: string) => void
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, onUpload }: ChatMessageProps) {
   const isUser = message.role === "user"
 
   return (
@@ -58,6 +60,25 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 width="600px" 
                 height="400px" 
               />
+            </div>
+          ) : message.type === "image" ? (
+            <div className="p-2 flex flex-col items-center">
+              <img
+                src={message.imageUrl}
+                alt={message.content || "업로드된 이미지"}
+                className="max-w-xs max-h-80 rounded-lg border border-gray-200 shadow"
+                style={{ objectFit: "contain" }}
+              />
+              {message.content && (
+                <div className="mt-2 text-xs text-gray-500 text-center">{message.content}</div>
+              )}
+            </div>
+          ) : message.type === "upload" ? (
+            <div className="p-2 flex flex-col items-center">
+              <div className="mb-2 text-base font-semibold text-[#160211]">{message.content}</div>
+              {onUpload && (
+                <TrashImageUpload onUpload={onUpload} />
+              )}
             </div>
           ) : null}
         </div>
