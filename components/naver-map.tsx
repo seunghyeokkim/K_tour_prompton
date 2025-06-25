@@ -35,8 +35,17 @@ declare global {
   }
 }
 
-interface NaverMapProps {
-  route?: {
+interface MapObjects {
+  map: any
+  markers: any[]
+  polylines: any[]
+  infoWindows: any[]
+  eventListeners: any[]
+}
+
+// 경로 표시용 지도 컴포넌트
+interface RouteMapProps {
+  route: {
     title: string
     address: string
     mapx: number
@@ -51,40 +60,27 @@ interface NaverMapProps {
   }
   width?: string
   height?: string
-  location: {
-    lat: number
-    lng: number
+  location?: {
     name: string
     address: string
-  }
-  walkPath?: {
     lat: number
     lng: number
-  }[]
+  }
 }
 
-interface MapObjects {
-  map: any
-  markers: any[]
-  polylines: any[]
-  infoWindows: any[]
-  eventListeners: any[]
-}
-
-export function NaverMap({ 
+export function RouteMap({ 
   route = [], 
   pathOptions = {
     width: 6,
-    color: '#3B82F6',
-    outlineColor: '#1E40AF',
+    color: '#ff86e1',
+    outlineColor: '#89bcff',
     outlineWidth: 2,
     patternInterval: 20
   },
   width = "100%", 
   height = "300px",
-  location,
-  walkPath = []
-}: NaverMapProps) {
+  location
+}: RouteMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapObjectsRef = useRef<MapObjects>({
     map: null,
@@ -95,46 +91,67 @@ export function NaverMap({
   })
   const isInitializedRef = useRef(false)
 
+  // 마커 이미지 URL 정의
+  const getRouteMarkerIcon = useCallback((type: 'start' | 'end' | 'waypoint') => {
+    switch (type) {
+      case 'start':
+        return {
+          content: '<div style="width: 20px; height: 20px; background: #ef4444; border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">S</div>',
+          size: new window.naver.maps.Size(24, 24),
+          anchor: new window.naver.maps.Point(12, 12)
+        }
+      case 'end':
+        return {
+          content: '<div style="width: 20px; height: 20px; background: #3b82f6; border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">E</div>',
+          size: new window.naver.maps.Size(24, 24),
+          anchor: new window.naver.maps.Point(12, 12)
+        }
+      case 'waypoint':
+        return {
+          content: '<div style="width: 16px; height: 16px; background: #f59e0b; border: 2px solid white; border-radius: 50%;"></div>',
+          size: new window.naver.maps.Size(20, 20),
+          anchor: new window.naver.maps.Point(10, 10)
+        }
+      default:
+        return null
+    }
+  }, [])
+
   // 지도 객체들 정리 함수
   const cleanupMapObjects = useCallback(() => {
     const objects = mapObjectsRef.current
     
-    // 이벤트 리스너 제거
     objects.eventListeners.forEach(listener => {
       if (window.naver?.maps?.Event?.removeListener) {
         window.naver.maps.Event.removeListener(listener)
       }
     })
     
-    // 정보창 닫기
     objects.infoWindows.forEach(infoWindow => {
       if (infoWindow.close) {
         infoWindow.close()
       }
     })
     
-    // 폴리라인 제거
     objects.polylines.forEach(polyline => {
       if (polyline.setMap) {
         polyline.setMap(null)
       }
     })
     
-    // 마커 제거
     objects.markers.forEach(marker => {
       if (marker.setMap) {
         marker.setMap(null)
       }
     })
     
-    // 배열 초기화
     objects.markers = []
     objects.polylines = []
     objects.infoWindows = []
     objects.eventListeners = []
   }, [])
 
-  // 경로 데이터 fetch 함수
+  // 경로 데이터 fetch 함수 (수정된 버전)
   const fetchRouteData = useCallback(async (routeData: typeof route) => {
     if (routeData.length < 2) return null
 
@@ -144,19 +161,19 @@ export function NaverMap({
 
     const appKey = "ECz1ZwyOcj91pngxWDBFr43NsbF7o2zUhwbQEYf3"
     
-    const requestData: Record<string, any> = {
-      startX: start.mapx,
-      startY: start.mapy,
-      endX: end.mapx,
-      endY: end.mapy,
-      startName: start.title,
-      endName: end.title,
-      reqCoordType: "WGS84GEO",
-      resCoordType: "WGS84GEO",
-    }
+    // URLSearchParams를 사용하여 올바른 형식으로 요청 데이터 구성
+    const formData = new URLSearchParams()
+    formData.append('startX', start.mapx.toString())
+    formData.append('startY', start.mapy.toString())
+    formData.append('endX', end.mapx.toString())
+    formData.append('endY', end.mapy.toString())
+    formData.append('startName', start.title)
+    formData.append('endName', end.title)
+    formData.append('reqCoordType', 'WGS84GEO')
+    formData.append('resCoordType', 'WGS84GEO')
 
     if (passList.length > 0) {
-      requestData.passList = passList.map(p => `${p.mapx},${p.mapy}`).join("_")
+      formData.append('passList', passList.map(p => `${p.mapx},${p.mapy}`).join('_'))
     }
 
     try {
@@ -164,19 +181,20 @@ export function NaverMap({
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          appKey: appKey,
+          "appKey": appKey,
         },
-        body: new URLSearchParams(requestData)
+        body: formData
       })
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        console.warn(`경로 API 응답 오류: ${response.status}`)
+        return null
       }
 
       const json = await response.json()
       return json.features || []
     } catch (error) {
-      console.error("경로 API 오류:", error)
+      console.warn("경로 API 호출 실패, 직선 경로로 대체:", error)
       return null
     }
   }, [])
@@ -185,22 +203,26 @@ export function NaverMap({
   const createRoutePolylines = useCallback((features: any[]) => {
     if (!features || !window.naver?.maps) return []
 
-    const seen = new Set<string>()
     const linePath: any[] = []
 
     features
       .filter((feature: any) => feature.geometry?.type === "LineString")
       .forEach((feature: any) => {
         feature.geometry.coordinates.forEach(([lng, lat]: [number, number]) => {
-          const key = `${lat.toFixed(6)},${lng.toFixed(6)}`
-          if (!seen.has(key)) {
-            seen.add(key)
-            linePath.push(new window.naver.maps.LatLng(lat, lng))
-          }
+          linePath.push(new window.naver.maps.LatLng(lat, lng))
         })
       })
 
     return linePath
+  }, [])
+
+  // 직선 경로 생성 함수 (API 실패 시 대체용)
+  const createStraightPath = useCallback((routeData: typeof route) => {
+    if (!window.naver?.maps || routeData.length < 2) return []
+    
+    return routeData.map(spot => 
+      new window.naver.maps.LatLng(spot.mapy, spot.mapx)
+    )
   }, [])
 
   // 폴리라인 생성 함수
@@ -213,12 +235,12 @@ export function NaverMap({
     const {
       width: pathWidth = 6,
       outlineWidth: pathOutlineWidth = 2,
-      color: pathColor = '#3B82F6',
-      outlineColor: pathOutlineColor = '#1E40AF',
+      color: pathColor = '#ff86e1',
+      outlineColor: pathOutlineColor = '#89bcff',
       patternInterval: pathPatternInterval = 20
     } = pathOptions
 
-    // 외곽선 (아웃라인) 경로
+    // 외곽선 경로
     const outlinePath = new window.naver.maps.Polyline({
       map: map,
       path: pathCoords,
@@ -240,19 +262,6 @@ export function NaverMap({
     })
     polylines.push(mainPath)
 
-    // 패턴 표시를 위한 점선 경로
-    if (pathPatternInterval > 0) {
-      const patternPath = new window.naver.maps.Polyline({
-        map: map,
-        path: pathCoords,
-        strokeColor: pathOutlineColor,
-        strokeWeight: 1,
-        strokeOpacity: 0.6,
-        strokeStyle: [pathPatternInterval, pathPatternInterval / 2]
-      })
-      polylines.push(patternPath)
-    }
-
     return polylines
   }, [pathOptions])
 
@@ -261,11 +270,16 @@ export function NaverMap({
     if (!window.naver?.maps || !mapRef.current || isInitializedRef.current) return
 
     try {
-      // 기존 객체들 정리
       cleanupMapObjects()
       
+      const center = route.length > 0 
+        ? new window.naver.maps.LatLng(route[0].mapy, route[0].mapx)
+        : location 
+          ? new window.naver.maps.LatLng(location.lat, location.lng)
+          : new window.naver.maps.LatLng(37.5665, 126.9780)
+
       const mapOptions = {
-        center: new window.naver.maps.LatLng(location.lat, location.lng),
+        center,
         zoom: 15,
         mapTypeControl: true,
         mapTypeControlOptions: {
@@ -282,68 +296,95 @@ export function NaverMap({
         mapDataControl: true
       }
 
-      // 지도 생성
       const map = new window.naver.maps.Map(mapRef.current, mapOptions)
       mapObjectsRef.current.map = map
 
-      // 마커 생성
-      
-      route.forEach((spot) => {
-        if (spot.mapx === location.lng && spot.mapy === location.lat) return
+      const bounds = new window.naver.maps.LatLngBounds()
+      let hasBounds = false
 
-        const position = new window.naver.maps.LatLng(spot.mapy, spot.mapx)
-        const marker = new window.naver.maps.Marker({
-          position,
-          map,
-          title: spot.title
-        })
-        mapObjectsRef.current.markers.push(marker)
-
-        const infoWindow = new window.naver.maps.InfoWindow({
-          content: `<div style="padding: 5px"><strong>${spot.title}</strong><br/>${spot.address}</div>`
-        })
-        mapObjectsRef.current.infoWindows.push(infoWindow)
-
-        const clickListener = window.naver.maps.Event.addListener(marker, "click", () => {
-          if (infoWindow.getMap()) {
-            infoWindow.close()
+      // 경로 마커 생성
+      if (route.length > 0) {
+        route.forEach((spot, index) => {
+          const position = new window.naver.maps.LatLng(spot.mapy, spot.mapx)
+          const isStart = index === 0
+          const isEnd = index === route.length - 1
+          
+          let markerIcon
+          if (isStart) {
+            markerIcon = getRouteMarkerIcon('start')
+          } else if (isEnd) {
+            markerIcon = getRouteMarkerIcon('end')
           } else {
-            infoWindow.open(map, marker)
+            markerIcon = getRouteMarkerIcon('waypoint')
           }
+
+          const marker = new window.naver.maps.Marker({
+            position,
+            map,
+            title: spot.title,
+            icon: markerIcon
+          })
+          mapObjectsRef.current.markers.push(marker)
+
+          const infoWindow = new window.naver.maps.InfoWindow({
+            content: `<div style="padding: 10px; max-width: 200px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              <div style="font-weight: bold; margin-bottom: 6px; font-size: 14px; color: ${isStart ? '#ef4444' : isEnd ? '#3b82f6' : '#f59e0b'};">
+                ${isStart ? '🚩 출발지' : isEnd ? '🏁 도착지' : `📍 경유지 ${index}`}
+              </div>
+              <div style="font-weight: 600; margin-bottom: 4px; font-size: 13px;">${spot.title}</div>
+              <div style="font-size: 12px; color: #666; line-height: 1.4;">${spot.address}</div>
+            </div>`
+          })
+          mapObjectsRef.current.infoWindows.push(infoWindow)
+
+          const clickListener = window.naver.maps.Event.addListener(marker, "click", () => {
+            mapObjectsRef.current.infoWindows.forEach(iw => {
+              if (iw !== infoWindow && iw.getMap()) {
+                iw.close()
+              }
+            })
+            
+            if (infoWindow.getMap()) {
+              infoWindow.close()
+            } else {
+              infoWindow.open(map, marker)
+            }
+          })
+          mapObjectsRef.current.eventListeners.push(clickListener)
+          
+          bounds.extend(position)
+          hasBounds = true
         })
-        mapObjectsRef.current.eventListeners.push(clickListener)
-      })
 
-      // 경로 처리
-      let allPathCoords: any[] = []
-
-      // 기존 walkPath 처리
-      if (walkPath.length > 1) {
-        const walkPathCoords = walkPath.map(coord => 
-          new window.naver.maps.LatLng(coord.lat, coord.lng)
-        )
-        allPathCoords = [...walkPathCoords]
-      }
-
-      // route 데이터로 경로 생성
-      if (route.length > 1) {
-        const routeFeatures = await fetchRouteData(route)
-        if (routeFeatures) {
-          const routeCoords = createRoutePolylines(routeFeatures)
-          allPathCoords = [...allPathCoords, ...routeCoords]
+        // 경로 그리기
+        if (route.length > 1) {
+          try {
+            const routeFeatures = await fetchRouteData(route)
+            let routeCoords: any[] = []
+            
+            if (routeFeatures && routeFeatures.length > 0) {
+              routeCoords = createRoutePolylines(routeFeatures)
+            }
+            
+            // API 경로가 없으면 직선 경로 사용
+            if (routeCoords.length === 0) {
+              routeCoords = createStraightPath(route)
+            }
+            
+            if (routeCoords.length > 1) {
+              const polylines = createPolylines(routeCoords)
+              mapObjectsRef.current.polylines.push(...polylines)
+              
+              routeCoords.forEach(coord => bounds.extend(coord))
+            }
+          } catch (error) {
+            console.warn("경로 생성 실패, 마커만 표시:", error)
+          }
         }
       }
 
-      // 폴리라인 생성
-      if (allPathCoords.length > 1) {
-        const polylines = createPolylines(allPathCoords)
-        mapObjectsRef.current.polylines.push(...polylines)
-
-        // 경로가 모두 보이도록 지도 영역 조정
-        const bounds = new window.naver.maps.LatLngBounds()
-        allPathCoords.forEach(coord => bounds.extend(coord))
-        bounds.extend(new window.naver.maps.LatLng(location.lat, location.lng))
-        
+      // 지도 영역 조정
+      if (hasBounds) {
         map.fitBounds(bounds, {
           top: 50,
           right: 50,
@@ -354,9 +395,9 @@ export function NaverMap({
 
       isInitializedRef.current = true
     } catch (error) {
-      console.error("지도 초기화 오류:", error)
+      console.error("경로 지도 초기화 오류:", error)
     }
-  }, [location, walkPath, route, pathOptions, cleanupMapObjects, fetchRouteData, createRoutePolylines, createPolylines])
+  }, [route, location, pathOptions, cleanupMapObjects, fetchRouteData, createRoutePolylines, createStraightPath, createPolylines, getRouteMarkerIcon])
 
   // 네이버 지도 API 로드
   useEffect(() => {
@@ -374,10 +415,6 @@ export function NaverMap({
         console.error("네이버 지도 API 로드 실패")
       }
       document.head.appendChild(script)
-
-      return () => {
-        document.head.removeChild(script)
-      }
     }
 
     loadNaverMapsAPI()
@@ -397,7 +434,7 @@ export function NaverMap({
       isInitializedRef.current = false
       initializeMap()
     }
-  }, [location.lat, location.lng, route, walkPath, pathOptions, initializeMap])
+  }, [route, pathOptions, initializeMap])
 
   return (
     <div 
@@ -405,7 +442,275 @@ export function NaverMap({
       style={{ width, height }} 
       className="rounded-lg border border-gray-200 bg-gray-100"
       role="application"
-      aria-label="네이버 지도"
+      aria-label="경로 표시 지도"
+    />
+  )
+}
+
+// 쓰레기통 위치 표시용 지도 컴포넌트 (수정된 버전)
+interface TrashMapProps {
+  trash_location: {
+    lat: number
+    lng: number
+    name: string
+    address: string
+  }[]
+  width?: string
+  height?: string
+  location?: {
+    name: string
+    address: string
+    lat: number
+    lng: number
+  }
+}
+
+export function TrashMap({ 
+  trash_location = [],
+  width = "100%", 
+  height = "300px",
+  location
+}: TrashMapProps) {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const mapObjectsRef = useRef<MapObjects>({
+    map: null,
+    markers: [],
+    polylines: [],
+    infoWindows: [],
+    eventListeners: []
+  })
+  const isInitializedRef = useRef(false)
+  const mapIdRef = useRef(`trash-map-${Date.now()}-${Math.random()}`)
+
+  // 쓰레기통 마커 아이콘
+  // const getTrashMarkerIcon = useCallback(() => {
+  //   return {
+  //     content: `<div style="
+  //       width: 24px; 
+  //       height: 24px; 
+  //       background: #22c55e; 
+  //       border: 2px solid white; 
+  //       border-radius: 50%; 
+  //       display: flex; 
+  //       align-items: center; 
+  //       justify-content: center; 
+  //       color: white; 
+  //       font-size: 12px; 
+  //       font-weight: bold;
+  //       font-family: Arial, sans-serif;
+  //       box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  //     ">T</div>`,
+  //     size: new window.naver.maps.Size(28, 28),
+  //     anchor: new window.naver.maps.Point(14, 14)
+  //   }
+  // }, [])
+    // 쓰레기통 마커 아이콘
+  const getTrashMarkerIcon = useCallback(() => {
+    return {
+      content: '<div style="width: 24px; height: 24px; background:rgb(134, 227, 168); border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px;">🗑️</div>',
+      size: new window.naver.maps.Size(28, 28),
+      anchor: new window.naver.maps.Point(14, 14)
+    }
+  }, [])
+  
+  // 지도 객체들 정리 함수
+  const cleanupMapObjects = useCallback(() => {
+    const objects = mapObjectsRef.current
+    
+    objects.eventListeners.forEach(listener => {
+      if (window.naver?.maps?.Event?.removeListener) {
+        window.naver.maps.Event.removeListener(listener)
+      }
+    })
+    
+    objects.infoWindows.forEach(infoWindow => {
+      if (infoWindow.close) {
+        infoWindow.close()
+      }
+    })
+    
+    objects.markers.forEach(marker => {
+      if (marker.setMap) {
+        marker.setMap(null)
+      }
+    })
+    
+    objects.markers = []
+    objects.polylines = []
+    objects.infoWindows = []
+    objects.eventListeners = []
+  }, [])
+
+  // 지도 초기화 함수 (수정된 버전)
+  const initializeMap = useCallback(() => {
+    if (!window.naver?.maps || !mapRef.current || isInitializedRef.current) return
+
+    // 지도 로드를 위한 약간의 지연
+    const initMap = () => {
+      try {
+        cleanupMapObjects()
+        
+        // 기본 중심점 설정
+        let center
+        if (trash_location.length > 0) {
+          center = new window.naver.maps.LatLng(trash_location[0].lat, trash_location[0].lng)
+        } else if (location) {
+          center = new window.naver.maps.LatLng(location.lat, location.lng)
+        } else {
+          center = new window.naver.maps.LatLng(37.5665, 126.9780)
+        }
+
+        const mapOptions = {
+          center,
+          zoom: 14,
+          mapTypeControl: true,
+          mapTypeControlOptions: {
+            style: window.naver.maps.MapTypeControlStyle.BUTTON,
+            position: window.naver.maps.Position.TOP_RIGHT,
+          },
+          zoomControl: true,
+          zoomControlOptions: {
+            style: window.naver.maps.ZoomControlStyle.SMALL,
+            position: window.naver.maps.Position.TOP_LEFT,
+          },
+          scaleControl: false,
+          logoControl: true,
+          mapDataControl: true
+        }
+
+        const map = new window.naver.maps.Map(mapRef.current!, mapOptions)
+        mapObjectsRef.current.map = map
+
+        // 지도가 완전히 로드된 후 마커 추가
+        const onMapLoad = () => {
+          const bounds = new window.naver.maps.LatLngBounds()
+          let hasBounds = false
+
+          // 쓰레기통 위치 마커 생성
+          trash_location.forEach((trash, index) => {
+            const position = new window.naver.maps.LatLng(trash.lat, trash.lng)
+            const trashIcon = getTrashMarkerIcon()
+            
+            const marker = new window.naver.maps.Marker({
+              position,
+              map,
+              title: trash.name || `쓰레기통 ${index + 1}`,
+              icon: trashIcon
+            })
+            mapObjectsRef.current.markers.push(marker)
+
+            const infoWindow = new window.naver.maps.InfoWindow({
+              content: `<div style="padding: 10px; max-width: 200px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                <div style="font-weight: bold; color: #22c55e; margin-bottom: 6px; font-size: 14px;">
+                  🗑️ ${trash.name || `쓰레기통 ${index + 1}`}
+                </div>
+                <div style="font-size: 12px; color: #666; line-height: 1.4;">
+                  ${trash.address || '주소 정보 없음'}
+                </div>
+              </div>`
+            })
+            mapObjectsRef.current.infoWindows.push(infoWindow)
+
+            const clickListener = window.naver.maps.Event.addListener(marker, "click", () => {
+              mapObjectsRef.current.infoWindows.forEach(iw => {
+                if (iw !== infoWindow && iw.getMap()) {
+                  iw.close()
+                }
+              })
+              
+              if (infoWindow.getMap()) {
+                infoWindow.close()
+              } else {
+                infoWindow.open(map, marker)
+              }
+            })
+            mapObjectsRef.current.eventListeners.push(clickListener)
+            
+            bounds.extend(position)
+            hasBounds = true
+          })
+
+          // 지도 영역 조정
+          if (hasBounds) {
+            setTimeout(() => {
+              map.fitBounds(bounds, {
+                top: 50,
+                right: 50,
+                bottom: 50,
+                left: 50
+              })
+            }, 100)
+          }
+        }
+
+        // 지도 로드 완료 이벤트 리스너
+        const idleListener = window.naver.maps.Event.addListener(map, 'idle', () => {
+          window.naver.maps.Event.removeListener(idleListener)
+          onMapLoad()
+        })
+
+        isInitializedRef.current = true
+      } catch (error) {
+        console.error("쓰레기통 지도 초기화 오류:", error)
+      }
+    }
+
+    // 약간의 지연 후 초기화 (다른 지도와의 충돌 방지)
+    setTimeout(initMap, 100)
+  }, [trash_location, location, cleanupMapObjects, getTrashMarkerIcon])
+
+  // 네이버 지도 API 로드
+  useEffect(() => {
+    const loadNaverMapsAPI = () => {
+      if (window.naver?.maps) {
+        // 약간의 지연을 두어 이전 지도가 완전히 로드된 후 초기화
+        setTimeout(initializeMap, 200)
+        return
+      }
+
+      const script = document.createElement("script")
+      script.src = "https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=k2473bxptd"
+      script.async = true
+      script.onload = () => {
+        setTimeout(initializeMap, 200)
+      }
+      script.onerror = () => {
+        console.error("네이버 지도 API 로드 실패")
+      }
+      
+      // 스크립트가 이미 로드되어 있는지 확인
+      if (!document.querySelector(`script[src="${script.src}"]`)) {
+        document.head.appendChild(script)
+      }
+    }
+
+    loadNaverMapsAPI()
+  }, [initializeMap])
+
+  // 컴포넌트 언마운트 시 정리
+  useEffect(() => {
+    return () => {
+      cleanupMapObjects()
+      isInitializedRef.current = false
+    }
+  }, [cleanupMapObjects])
+
+  // props 변경 시 지도 업데이트
+  useEffect(() => {
+    if (isInitializedRef.current && trash_location.length > 0) {
+      isInitializedRef.current = false
+      setTimeout(initializeMap, 100)
+    }
+  }, [trash_location, initializeMap])
+
+  return (
+    <div 
+      id={mapIdRef.current}
+      ref={mapRef} 
+      style={{ width, height, minHeight: height }} 
+      className="rounded-lg border border-gray-200 bg-gray-100"
+      role="application"
+      aria-label="쓰레기통 위치 지도"
     />
   )
 }

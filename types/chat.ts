@@ -11,18 +11,30 @@ export interface TextMessage extends BaseMessage {
 
 export interface MapMessage extends BaseMessage {
   type: "map"
-  route: {
+  role: "assistant"
+  timestamp: Date
+  route?: {
     title: string
     address: string
     mapx: number
     mapy: number
-  }[],
-  location: {
+  }[]
+  trash_location?: {
+    lat: number
+    lng: number
+    name: string
+    address: string
+  }[]
+  location?: {
     name: string
     address: string
     lat: number
     lng: number
   }
+  walkPath?: {
+    lat: number
+    lng: number
+  }[]
   content?: string
 }
 

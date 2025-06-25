@@ -1,6 +1,6 @@
 import { User, Bot, MapPin } from "lucide-react"
 import type { Message } from "../types/chat"
-import { NaverMap } from "./naver-map"  // ← NaverMap 컴포넌트 import 추가
+import { TrashMap, RouteMap } from "./naver-map"  // ← NaverMap 컴포넌트 import 추가
 import TrashImageUpload from "./TrashImageUpload"
 
 
@@ -47,19 +47,32 @@ export function ChatMessage({ message, onUpload }: ChatMessageProps) {
             //   title="Tmap"
             // />
             <div className="p-2">
-              <NaverMap 
-                route={message.route}
-                location={message.location} // 👈 필수 추가
-                pathOptions={{
-                  width: 6,
-                  color: '#ff86e1',
-                  outlineColor: '#89bcff',
-                  outlineWidth: 2,
-                  patternInterval: 20
-                }}
-                width="600px" 
-                height="400px" 
-              />
+              {/* 경로가 있으면 RouteMap 사용 */}
+              {message.route && message.route.length > 0 && (
+                <RouteMap 
+                  route={message.route}
+                  location={message.location}
+                  pathOptions={{
+                    width: 6,
+                    color: '#ff86e1',
+                    outlineColor: '#89bcff',
+                    outlineWidth: 2,
+                    patternInterval: 20
+                  }}
+                  width="600px" 
+                  height="400px" 
+                />
+              )}
+              
+              {/* 쓰레기통 위치가 있으면 TrashMap 사용 */}
+              {message.trash_location && message.trash_location.length > 0 && (
+                <TrashMap 
+                  trash_location={message.trash_location}
+                  location={message.location}
+                  width="600px" 
+                  height="400px" 
+                />
+              )}
             </div>
           ) : message.type === "image" ? (
             <div className="p-2 flex flex-col items-center">

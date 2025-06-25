@@ -6,7 +6,8 @@ from tour_api import get_filtered_tourist_data, get_detailed_tourist_data
 from laas_api import MultiTurnChat
 import json
 import uvicorn
-from config import HASH_LOCATION, HASH_PLACE, HASH_ROUTE, HASH_IMAGE, HASH_TRASHBAG
+import re
+from config import HASH_LOCATION, HASH_PLACE, HASH_ROUTE, HASH_IMAGE, HASH_TRASHBAG, HASH_RAG
 
 app = FastAPI()
 
@@ -42,7 +43,10 @@ class ImageChatRequest(BaseModel):
 class TrashbagEvaluateRequest(BaseModel):
     prompt: str
     image_base64: str
-
+class TrashRAG(BaseModel):
+    area_name: str
+    sigungu_name: str
+    
 # ========================== 유틸 함수 ==========================
 # 1. 어시스턴트 응답 추출
 def extract_assistant_response(response) -> str:
@@ -219,7 +223,7 @@ def recommend_place(data: recommend_place_UserRequest):
         )
         print("📦 LaaS 응답 내용:")
         user_pick_place = extract_user_pick_place(user_pick_response)
-        print(user_pick_place.json())
+        print(user_pick_response.json())
         
         # ✅ 사용자가 선택한 장소가 존재할 경우 경로 계산
         if user_pick_place:
@@ -401,6 +405,83 @@ def evaluate_trashbag(data: TrashbagEvaluateRequest):
     except Exception as e:
         print(f"⚠️ 쓰봉판단 처리 중 예외: {e}")
         return {"error": str(e), "success": False}
+
+# ========================== ⑥ 플로깅 쓰레기통 RAG ==========================
+@app.post("/location/trashRAG")
+def get_trash_RAG(data: TrashRAG):
+    """
+    특정 지역의 플로깅 쓰레기통 위치 정보를 요청하고, 위도/경도 추출
+    """
+    print(f"📍 쓰레기통 RAG 요청: {data.area_name} {data.sigungu_name}")
+    print(f"📊 현재 대화 기록: {chat.get_conversation_history()}")
+    
+    #이전 대화 기록 초기화
+    chat.clear_history()
+    message_content = f"{data.area_name} {data.sigungu_name} 지역의 쓰레기통 위치 정보 요청"
+
+    response = chat.send_message(
+        message_content,
+        HASH_RAG
+    )
+
+    try:
+        content = extract_assistant_response(response)
+        print(f"🤖 어시스턴트 응답: {content}")
+
+        try:
+            # ✅ 배열 형태로 감싸기 전처리
+            if not content.strip().startswith("["):
+                # 쉼표로 구분된 다수의 JSON 객체 → 배열로 감싸기
+                # (단순히 {} 블록을 찾아 배열 형태로 구성)
+                json_objects = re.findall(r'{.*?}', content, re.DOTALL)
+                content = "[" + ",".join(json_objects) + "]"
+
+            trash_data = json.loads(content)
+            
+            if isinstance(trash_data, list):
+                locations = []
+                for item in trash_data:
+                    try:
+                        lat = float(item.get("위도"))
+                        lng = float(item.get("경도"))
+                        locations.append({
+                            "name": item.get("설치장소명"),
+                            "lat": lat,
+                            "lng": lng,
+                            "address": item.get("소재지도로명주소")
+                        })
+                    except Exception as e:
+                        print(f"⚠️ 위도/경도 파싱 실패: {e}")
+                        continue
+                print(f"📍 추출된 쓰레기통 위치 수: {locations}")
+                return {
+                    "area": data.area_name,
+                    "sigungu": data.sigungu_name,
+                    "trash_locations": locations,
+                    "count": len(locations),
+                    "conversation_length": len(chat.get_conversation_history()),
+                    "success": True
+                }
+            else:
+                return {
+                    "message": content,
+                    "warning": "⚠️ 예상한 JSON 배열 형식이 아닙니다.",
+                    "conversation_length": len(chat.get_conversation_history()),
+                    "success": False
+                }
+
+        except json.JSONDecodeError:
+            print("⚠️ JSON 파싱 실패")
+            return {
+                "message": content,
+                "warning": "⚠️ JSON 파싱 실패. 텍스트 응답입니다.",
+                "conversation_length": len(chat.get_conversation_history()),
+                "success": False
+            }
+
+    except Exception as e:
+        print(f"⚠️ 예외 발생: {e}")
+        return {"error": f"⚠️ 예외 발생: {e}"}
 
 #========================== 상태 확인 ==========================
 

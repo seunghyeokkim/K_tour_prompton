@@ -14,7 +14,8 @@ import {
   LocationExtractResponse,
   RecommendPlaceResponse,
   imageChatAPI,
-  evaluateTrashbagAPI
+  evaluateTrashbagAPI,
+  getTrashRAGAPI
 } from "./utils/api"
 import TrashImageUpload from "./components/TrashImageUpload"
 
@@ -25,6 +26,10 @@ export default function AIChatbotInterface() {
   const [recommended, setRecommended] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [showChat, setShowChat] = useState(false)
+
+  // 지역 정보 추적용 상태 (효율이 떨어질 수 있지만, 간단한 예시로 유지)
+  const [lastArea, setLastArea] = useState("")
+  const [lastSigungu, setLastSigungu] = useState("")
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -58,6 +63,8 @@ export default function AIChatbotInterface() {
         const { area, sigungu, message } = extractRes;
 
         if (area && sigungu) {
+          setLastArea(area)
+          setLastSigungu(sigungu)
           const recommendRes: RecommendPlaceResponse = await recommendPlaceAPI(
             `${area} ${sigungu} 플로깅 장소 추천`,
             area,
@@ -211,7 +218,6 @@ export default function AIChatbotInterface() {
                   onUpload={
                     message.type === "upload"
                       ? async (file: File, previewUrl: string) => {
-                          // 업로드된 이미지를 채팅 메시지로 추가
                           setMessages((prev) => [
                             ...prev,
                             {
@@ -220,11 +226,11 @@ export default function AIChatbotInterface() {
                               imageUrl: previewUrl,
                               role: "user",
                               timestamp: new Date(),
-                              content: "사용자 업로드 이미지"
-                            }
-                          ]);
-                          // 평가 안내 메시지 추가 (로딩)
-                          const evalMsgId = uuidv4();
+                              content: "사용자 업로드 이미지",
+                            },
+                          ])
+
+                          const evalMsgId = uuidv4()
                           setMessages((prev) => [
                             ...prev,
                             {
@@ -233,28 +239,55 @@ export default function AIChatbotInterface() {
                               content: "쓰레기 봉투 평가 중...",
                               role: "assistant",
                               timestamp: new Date(),
-                            }
-                          ]);
+                            },
+                          ])
+
                           try {
-                            const prompt = "다음이 유저가 주는 쓰레기 봉투 이미지이다. 이 이미지를 보고 플로깅 성과를 평가해줘.";
-                            const result = await evaluateTrashbag(prompt, previewUrl);
-                            setMessages((prev) => prev.map(m =>
-                              m.id === evalMsgId
-                                ? {
-                                    ...m,
-                                    content: result.result || "평가 결과를 받아오지 못했습니다."
-                                  }
-                                : m
-                            ));
+                            const prompt = "다음이 유저가 주는 쓰레기 봉투 이미지이다. 이 이미지를 보고 플로깅 성과를 평가해줘."
+                            const result = await evaluateTrashbag(prompt, previewUrl)
+
+                            setMessages((prev) =>
+                              prev.map((m) =>
+                                m.id === evalMsgId
+                                  ? { ...m, content: result.result || "평가 결과를 받아오지 못했습니다." }
+                                  : m
+                              )
+                            )
+
+                            // 🎯 평가 성공 후: 쓰레기통 위치 표시
+
+                            const ragResult = await getTrashRAGAPI(lastArea, lastSigungu)
+                            if (ragResult.success && ragResult.trash_locations?.length > 0) {
+                              setMessages((prev) => [
+                                ...prev,
+                                {
+                                  id: uuidv4(),
+                                  type: "map",
+                                  role: "assistant",
+                                  timestamp: new Date(),
+                                  location: {
+                                    name: ragResult.area + " " + ragResult.sigungu,
+                                    address: ragResult.trash_locations[0].address,
+                                    lat: ragResult.trash_locations[0].lat,
+                                    lng: ragResult.trash_locations[0].lng,
+                                  },
+                                  trash_location: ragResult.trash_locations.map((t: any) => ({
+                                    name: t.name,
+                                    address: t.address,
+                                    lng: t.lng,
+                                    lat: t.lat,
+                                  })),
+                                },
+                              ])
+                            }
                           } catch (e) {
-                            setMessages((prev) => prev.map(m =>
-                              m.id === evalMsgId
-                                ? {
-                                    ...m,
-                                    content: "평가 중 오류가 발생했습니다."
-                                  }
-                                : m
-                            ));
+                            setMessages((prev) =>
+                              prev.map((m) =>
+                                m.id === evalMsgId
+                                  ? { ...m, content: "평가 중 오류가 발생했습니다." }
+                                  : m
+                              )
+                            )
                           }
                         }
                       : undefined
