@@ -93,6 +93,18 @@ export function ChatMessage({ message, onUpload }: ChatMessageProps) {
                 <TrashImageUpload onUpload={onUpload} />
               )}
             </div>
+          ) : message.type === "reward" ? (
+            <div className="p-4 flex flex-col items-center">
+              <div className="text-2xl mb-2">{message.badge}</div>
+              <div className="font-bold text-lg mb-1">{message.content}</div>
+              <div className="text-[#456288] mb-2">
+                전국 달성률: <b>{message.percent}%</b> ({message.uniqueAreaCount} / 17개 시·도)
+              </div>
+              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-2">
+                <div className="h-full bg-gradient-to-r from-[#ff86e1] to-[#89bcff]" style={{ width: `${message.percent}%` }} />
+              </div>
+              <div className="text-xs text-[#56637e]">다른 시/도도 도전해보세요!</div>
+            </div>
           ) : null}
         </div>
 

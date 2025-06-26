@@ -49,4 +49,12 @@ export interface UploadMessage extends BaseMessage {
   content: string // 안내 문구
 }
 
-export type Message = TextMessage | MapMessage | ImageMessage | UploadMessage
+export interface RewardMessage extends BaseMessage {
+  type: "reward"
+  content: string
+  badge: string
+  percent: number
+  uniqueAreaCount: number
+}
+
+export type Message = TextMessage | MapMessage | ImageMessage | UploadMessage | RewardMessage

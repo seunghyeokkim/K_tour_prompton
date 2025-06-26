@@ -1,7 +1,7 @@
 "use client"
 
 import { v4 as uuidv4 } from "uuid"
-import type React from "react"
+import React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Sparkles, Send, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,10 @@ import {
   getTrashRAGAPI
 } from "./utils/api"
 import TrashImageUpload from "./components/TrashImageUpload"
+import KoreaSVGMap from './components/KoreaSVGMap'
+import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps"
+import { geoCentroid } from "d3-geo"
+import SouthKorea from '@svg-maps/south-korea/south-korea.svg'
 
 export default function AIChatbotInterface() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -30,6 +34,10 @@ export default function AIChatbotInterface() {
   // 지역 정보 추적용 상태 (효율이 떨어질 수 있지만, 간단한 예시로 유지)
   const [lastArea, setLastArea] = useState("")
   const [lastSigungu, setLastSigungu] = useState("")
+
+  // ✅ 시/도 단위 달성 상태
+  const [completedAreas, setCompletedAreas] = useState<string[]>([])
+  const TOTAL_AREAS = 17;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -143,7 +151,7 @@ export default function AIChatbotInterface() {
               type: "upload",
               role: "assistant",
               timestamp: new Date(),
-              content: "쓰레기 이미지를 업로드해주세요!"
+              content: "플로깅 완료 시 수거한 쓰레기 이미지를 업로드해주세요!"
             }
           ]);
         }
@@ -212,55 +220,59 @@ export default function AIChatbotInterface() {
           <div className="flex-1 overflow-y-auto p-4">
             <div className="max-w-4xl mx-auto">
               {messages.map((message) => (
-                <ChatMessage
-                  key={message.id}
-                  message={message}
-                  onUpload={
-                    message.type === "upload"
-                      ? async (file: File, previewUrl: string) => {
-                          setMessages((prev) => [
-                            ...prev,
-                            {
-                              id: uuidv4(),
-                              type: "image",
-                              imageUrl: previewUrl,
-                              role: "user",
-                              timestamp: new Date(),
-                              content: "사용자 업로드 이미지",
-                            },
-                          ])
+                <React.Fragment key={message.id}>
+                  {message.type === "reward" && (
+                    <div className="flex justify-center my-4">
+                      <KoreaSVGMap completedAreas={completedAreas} />
+                    </div>
+                  )}
+                  <ChatMessage
+                    message={message}
+                    onUpload={
+                      message.type === "upload"
+                        ? async (file: File, previewUrl: string) => {
+                            setMessages((prev) => [
+                              ...prev,
+                              {
+                                id: uuidv4(),
+                                type: "image",
+                                imageUrl: previewUrl,
+                                role: "user",
+                                timestamp: new Date(),
+                                content: "사용자 업로드 이미지",
+                              },
+                            ])
 
-                          const evalMsgId = uuidv4()
-                          setMessages((prev) => [
-                            ...prev,
-                            {
-                              id: evalMsgId,
-                              type: "text",
-                              content: "쓰레기 봉투 평가 중...",
-                              role: "assistant",
-                              timestamp: new Date(),
-                            },
-                          ])
+                            const evalMsgId = uuidv4()
+                            setMessages((prev) => [
+                              ...prev,
+                              {
+                                id: evalMsgId,
+                                type: "text",
+                                content: "쓰레기 확인 중...",
+                                role: "assistant",
+                                timestamp: new Date(),
+                              },
+                            ])
 
-                          try {
-                            const prompt = "다음이 유저가 주는 쓰레기 봉투 이미지이다. 이 이미지를 보고 플로깅 성과를 평가해줘."
-                            const result = await evaluateTrashbag(prompt, previewUrl)
+                            try {
+                              const prompt = "다음이 유저가 주는 쓰레기 봉투 이미지이다. 이 이미지를 보고 플로깅 성과를 평가해줘."
+                              const result = await evaluateTrashbag(prompt, previewUrl)
 
-                            setMessages((prev) =>
-                              prev.map((m) =>
-                                m.id === evalMsgId
-                                  ? { ...m, content: result.result || "평가 결과를 받아오지 못했습니다." }
-                                  : m
-                              )
-                            )
+                              // 1. 평가 결과 예쁘게 파싱
+                              let evalContent = result.result || "평가 결과를 받아오지 못했습니다.";
+                              try {
+                                const parsed = JSON.parse(evalContent);
+                                evalContent = `점수: ${parsed.score}\n요약: ${parsed.summary}\n피드백: ${parsed.feedback}`;
+                              } catch (e) {}
 
-                            // 🎯 평가 성공 후: 쓰레기통 위치 표시
+                              // 2. 쓰레기통 안내/리워드 메시지 한 번에 추가
+                              const ragResult = await getTrashRAGAPI(lastArea, lastSigungu);
+                              let newMessages: Message[] = [];
 
-                            const ragResult = await getTrashRAGAPI(lastArea, lastSigungu)
-                            if (ragResult.success && ragResult.trash_locations?.length > 0) {
-                              setMessages((prev) => [
-                                ...prev,
-                                {
+                              // 쓰레기통 지도를 가장 먼저 추가 (정보가 있을 때만)
+                              if (ragResult.success && ragResult.trash_locations?.length > 0) {
+                                newMessages.push({
                                   id: uuidv4(),
                                   type: "map",
                                   role: "assistant",
@@ -277,22 +289,61 @@ export default function AIChatbotInterface() {
                                     lng: t.lng,
                                     lat: t.lat,
                                   })),
-                                },
-                              ])
-                            }
-                          } catch (e) {
-                            setMessages((prev) =>
-                              prev.map((m) =>
-                                m.id === evalMsgId
-                                  ? { ...m, content: "평가 중 오류가 발생했습니다." }
-                                  : m
+                                });
+                              }
+
+                              // 평가 결과를 두 번째로 추가
+                              newMessages.push({
+                                id: uuidv4(),
+                                type: "text",
+                                content: evalContent,
+                                role: "assistant",
+                                timestamp: new Date(),
+                              });
+
+                              // 리워드 메시지를 마지막에 추가
+                              let uniqueAreaCount = completedAreas.includes(lastArea) ? completedAreas.length : completedAreas.length + 1;
+                              let percent = Math.round((uniqueAreaCount / TOTAL_AREAS) * 100);
+                              let badge = "";
+                              if (uniqueAreaCount >= 17) badge = "🌏 전국 정복자";
+                              else if (uniqueAreaCount >= 10) badge = "🏅 플로깅 마스터";
+                              else if (uniqueAreaCount >= 5) badge = "🥉 열정 플로거";
+                              else if (uniqueAreaCount >= 1) badge = "🎉 첫 플로깅 달성";
+                              newMessages.push({
+                                id: uuidv4(),
+                                type: "reward",
+                                role: "assistant",
+                                timestamp: new Date(),
+                                content: `${lastArea} 플로깅 완료!`,
+                                badge,
+                                percent,
+                                uniqueAreaCount,
+                              });
+
+                              // 메시지 한 번만 추가!
+                              setMessages((prevMsg) => [...prevMsg, ...newMessages]);
+
+                              // 완료 지역도 한 번만 갱신!
+                              setCompletedAreas((prev) => {
+                                if (lastArea && !prev.includes(lastArea)) {
+                                  return [...prev, lastArea];
+                                }
+                                return prev;
+                              });
+                            } catch (e) {
+                              setMessages((prev) =>
+                                prev.map((m) =>
+                                  m.id === evalMsgId
+                                    ? { ...m, content: "평가 중 오류가 발생했습니다." }
+                                    : m
+                                )
                               )
-                            )
+                            }
                           }
-                        }
-                      : undefined
-                  }
-                />
+                        : undefined
+                    }
+                  />
+                </React.Fragment>
               ))}
               {isLoading && (
                 <div className="flex gap-3 justify-start mb-6">
