@@ -159,7 +159,8 @@ export function RouteMap({
     const end = routeData[routeData.length - 1]
     const passList = routeData.slice(1, -1)
 
-    const appKey = "ECz1ZwyOcj91pngxWDBFr43NsbF7o2zUhwbQEYf3"
+    
+    const appKey = process.env.NEXT_PUBLIC_APP_KEY ?? "";
     
     // URLSearchParams를 사용하여 올바른 형식으로 요청 데이터 구성
     const formData = new URLSearchParams()
@@ -398,27 +399,32 @@ export function RouteMap({
       console.error("경로 지도 초기화 오류:", error)
     }
   }, [route, location, pathOptions, cleanupMapObjects, fetchRouteData, createRoutePolylines, createStraightPath, createPolylines, getRouteMarkerIcon])
+ 
+  naver_key: process.env.NEXT_PUBLIC_NAVER_MAP_KEY ?? ""
 
   // 네이버 지도 API 로드
   useEffect(() => {
-    const loadNaverMapsAPI = () => {
-      if (window.naver?.maps) {
-        initializeMap()
-        return
-      }
+  const naver_key = process.env.NEXT_PUBLIC_NAVER_MAP_KEY ?? "";
 
-      const script = document.createElement("script")
-      script.src = "https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=k2473bxptd"
-      script.async = true
-      script.onload = initializeMap
-      script.onerror = () => {
-        console.error("네이버 지도 API 로드 실패")
-      }
-      document.head.appendChild(script)
+  const loadNaverMapsAPI = () => {
+    if (window.naver?.maps) {
+      initializeMap();
+      return;
     }
 
-    loadNaverMapsAPI()
-  }, [initializeMap])
+    const script = document.createElement("script");
+    script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${naver_key}`;
+    script.async = true;
+    script.onload = initializeMap;
+    script.onerror = () => {
+      console.error("네이버 지도 API 로드 실패");
+    };
+    document.head.appendChild(script);
+  };
+
+    loadNaverMapsAPI();
+  }, [initializeMap]);
+
 
   // 컴포넌트 언마운트 시 정리
   useEffect(() => {
@@ -482,28 +488,6 @@ export function TrashMap({
   const isInitializedRef = useRef(false)
   const mapIdRef = useRef(`trash-map-${Date.now()}-${Math.random()}`)
 
-  // 쓰레기통 마커 아이콘
-  // const getTrashMarkerIcon = useCallback(() => {
-  //   return {
-  //     content: `<div style="
-  //       width: 24px; 
-  //       height: 24px; 
-  //       background: #22c55e; 
-  //       border: 2px solid white; 
-  //       border-radius: 50%; 
-  //       display: flex; 
-  //       align-items: center; 
-  //       justify-content: center; 
-  //       color: white; 
-  //       font-size: 12px; 
-  //       font-weight: bold;
-  //       font-family: Arial, sans-serif;
-  //       box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  //     ">T</div>`,
-  //     size: new window.naver.maps.Size(28, 28),
-  //     anchor: new window.naver.maps.Point(14, 14)
-  //   }
-  // }, [])
     // 쓰레기통 마커 아이콘
   const getTrashMarkerIcon = useCallback(() => {
     return {
@@ -662,6 +646,8 @@ export function TrashMap({
   // 네이버 지도 API 로드
   useEffect(() => {
     const loadNaverMapsAPI = () => {
+      const naverKey = process.env.NEXT_PUBLIC_NAVER_MAP_KEY ?? "";
+
       if (window.naver?.maps) {
         // 약간의 지연을 두어 이전 지도가 완전히 로드된 후 초기화
         setTimeout(initializeMap, 200)
@@ -669,7 +655,7 @@ export function TrashMap({
       }
 
       const script = document.createElement("script")
-      script.src = "https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=k2473bxptd"
+      script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${naverKey}`;
       script.async = true
       script.onload = () => {
         setTimeout(initializeMap, 200)

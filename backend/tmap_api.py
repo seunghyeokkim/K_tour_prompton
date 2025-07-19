@@ -64,18 +64,3 @@ def get_pedestrian_route(
         return response.json()
     else:
         raise Exception(f"Tmap API 오류 {response.status_code}: {response.text}")
-
-# # Example usage
-# if __name__ == "__main__":
-#     try:
-#         route = get_pedestrian_route(
-#             app_key=TMAP_API_KEY,
-#             start_coords=(126.978388, 37.566610),
-#             end_coords=(126.985302, 37.570000),
-#             pass_list=[(126.980000, 37.568000)],
-#             start_name="서울역",
-#             end_name="남산타워"
-#         )
-#         print(route)
-#     except Exception as e:
-#         print(f"오류 발생: {e}")

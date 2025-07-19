@@ -1,4 +1,5 @@
 import requests
+from config import TOUR_API_KEY
 
 AREA_CODE_DICT = {
     "서울": "1", "인천": "2", "대전": "3", "대구": "4", "광주": "5", "부산": "6", "울산": "7",
@@ -7,7 +8,7 @@ AREA_CODE_DICT = {
     "전라남도": "38", "제주도": "39"
 }
 
-SERVICE_KEY = 'OftZ6VfoPjj9qR5M02CdC4pdjXY7G2qMUmKM1EnkYfw1eUXRKuK+/H1S6CUyJUpt1meaQ2uH+KXBnqbfAsx/NA=='
+SERVICE_KEY = TOUR_API_KEY
 
 def get_sigungu_code(area_code, sigungu_name):
     url = "http://apis.data.go.kr/B551011/KorService2/areaCode2"

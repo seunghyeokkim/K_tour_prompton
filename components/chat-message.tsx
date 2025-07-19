@@ -39,13 +39,6 @@ export function ChatMessage({ message, onUpload }: ChatMessageProps) {
               </p>
             </div>
           ) : message.type === "map" ? (
-            // <iframe
-            //   src={`/tmap-frame.html?route=${encodeURIComponent(JSON.stringify(message.route))}`}
-            //   width="600px"
-            //   height="400px"
-            //   style={{ border: "none" }}
-            //   title="Tmap"
-            // />
             <div className="p-2">
               {/* 경로가 있으면 RouteMap 사용 */}
               {message.route && message.route.length > 0 && (
